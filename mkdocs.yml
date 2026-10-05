@@ -1,0 +1,106 @@
+site_name: SGLang DAS Deployment Best Practices
+site_description: 已脱敏的 SGLang DAS 部署方案、版本与验证记录
+repo_url: https://github.com/sixgod-666/sglang-das-deployment-docs
+repo_name: sixgod-666/sglang-das-deployment-docs
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+nav:
+  - 首页: index.md
+  - 开始使用: getting-started/index.md
+  - 部署方案:
+      - 总览: deployment-guide/index.md
+      - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-CP8EP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(cp8ep8).md
+      - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-DP8TP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(dp8tp8).md
+  - 参考:
+      - 软件栈: reference/software-stack.md
+      - 部署占位符约定: reference/deployment-placeholders.md
+  - 维护者:
+      - Recipe 模板: maintainer/recipe-template.md
+exclude_docs: |
+  deployment-guide/deepseek-v4-flash.md
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 跟随系统主题
+
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+  - macros:
+      on_undefined: strict
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  stack:
+    sglang_das:
+      repository: https://github.com/lihenga/sglang-das
+      branch: feat/optimize_prefetch
+      validated_commit: 9957b5dabb3d8dc183a48f527f226a920122a241
+    mooncake:
+      commit: 待填写
+    wheel:
+      sha256: 待填写
+    container_image:
+      digest: 待填写
+    model:
+      revision: 待填写

@@ -1,0 +1,12 @@
+[project]
+name = "sglang-das-deployment-docs"
+version = "0.1.0"
+description = "Sanitized public deployment best-practices site for SGLang DAS"
+requires-python = ">=3.10"
+dependencies = [
+    "mkdocs-material>=9.7,<10",
+    "mkdocs-macros-plugin>=1.5,<2",
+]
+
+[tool.uv]
+package = false
