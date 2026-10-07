@@ -13,7 +13,7 @@ nav:
   - 部署方案:
       - 总览: deployment-guide/index.md
       - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-CP8EP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(cp8ep8).md
-      - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-DP8TP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(dp8tp8).md
+      - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-DP8EP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(dp8ep8).md
   - 参考:
       - 软件栈: reference/software-stack.md
       - 部署占位符约定: reference/deployment-placeholders.md

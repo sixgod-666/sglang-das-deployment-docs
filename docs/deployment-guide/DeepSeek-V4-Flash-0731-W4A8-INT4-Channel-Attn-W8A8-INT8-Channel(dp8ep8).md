@@ -1,6 +1,6 @@
-# DeepSeek-V4-W4A8-CP8EP8
+# DeepSeek-V4-W4A8-DP8EP8
 
-本页按部署形态分别维护 **PD 分离** 与 **IFB** 的可回溯 Recipe。PD 分离已归档 GPU-only（L1）、CPU（L1 + L3）和 DFS（L1 + L3 + L4）三类脚本快照；IFB 尚无已验证配置。
+本页按部署形态维护 **PD 分离** 的可回溯 Recipe，已归档 GPU-only（L1）、CPU（L1 + L3）和 DFS（L1 + L3 + L4）三类脚本快照。GPU-only 与 CPU 的 Prefill、Decode 均采用 `TP8 / PP1 / DP8 / EP8`。
 
 ## 受控软件栈
 
@@ -45,17 +45,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
 === "PD 分离"
 
-    本页只维护部署拓扑、环境和脚本快照。压测方法、输入参数和结果将迁移到后续与“部署方案”同级的独立页面。
-
     ## 1. GPU-only（L1）
 
     ### 1.1 部署方式
 
     | 项目 | 值 |
     | --- | --- |
-    | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP1 / EP8`，开启 CP（`interleave`） |
+    | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
     | Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
-    | 缓存层级 | GPU-only（L1）；该归档没有 Mooncake master/client 启动脚本 |
+    | 缓存层级 | GPU-only（L1）；不启动 Mooncake master/client |
     | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
 
     ### 1.2 自动化配置
@@ -64,7 +62,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # PD 分离部署配置（内部工作路径已脱敏）
     # 拓扑: P=<PREFILL_NODE_IP>（CP8EP8，8 卡）；D=<DECODE_NODE_IP>（TP8DP8，8 卡）；Router 位于 P 节点的 10015 端口
     # 变量引用语法: ${common:xxx} 由框架在解析时展开;值内 bash 语法($VAR/$((..)))原样透传
-    # 优化显存参数-  --disable-overlap-schedule +
+    #脚本状态:kaiqi读聚合; 桶大小4G ;8G内存 ; OVERLAP -
 
     [common]
     # --- 模型与端口 ---
@@ -86,10 +84,11 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
 
+
     [pd_disagg]
     prefill_nodes = ${common:p_node_ip}
     decode_nodes = ${common:d_node_ip}
-    mooncake_clients = ${common:mc_node_ip}
+
 
     [router]
     pd-disaggregation = true
@@ -107,19 +106,22 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     log-level = info
 
     [sglang_prefill]
-    # --- Prefill: CP8EP8 PP1 + DSPARK (03_p_24.sh) ---
+    reasoning-parser = deepseek-v4
+    enable-strict-thinking = true
+    tool-call-parser = deepseekv4
     model-path = ${common:model_path}
+    trust-remote-code = True
     model-loader-extra-config = ${common:model_loader_config}
     quantization = slimquant_marlin
-    trust-remote-code = True
     host = 0.0.0.0
     port = ${common:sglang_port}
     tp-size = 8
     pp-size = 1
-    dp = 1
+    dp = 8
     ep = 8
-    enable-prefill-cp = true
-    cp-strategy = interleave
+    enable-dp-attention = true
+    enable-dp-lm-head = true
+    enable-dp-attention-local-control-broadcast= true
     moe-dense-tp-size = 1
     moe-a2a-backend = megamoe
     moe-runner-backend = auto
@@ -131,7 +133,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     node-rank = 0
     dist-timeout = 10000
     watchdog-timeout = 3600
-    max-total-tokens = 1788918
+    #max-total-tokens = 1788928
     disaggregation-mode = prefill
     disaggregation-transfer-backend = mooncake
     disaggregation-bootstrap-port = ${common:bootstrap_port}
@@ -146,17 +148,14 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 96
-    reasoning-parser = deepseek-v4
-    tool-call-parser = deepseekv4
+    max-running-requests = 48
+
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
     tokenizer-worker-num = 8
     enable-metrics = true
     enable-request-time-stats-logging = true
-    disable-overlap-schedule = true
-    enable-cp-cache-layer-split  = true
-    cuda-graph-backend-prefill = disabled
+
     enable-cache-report = true
     tokenizer-backend = fastokens
 
@@ -182,15 +181,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-total-tokens = 950000
     disable-flashinfer-autotune = true
     cuda-graph-max-bs = 8
-    mem-fraction-static = 0.85
+    mem-fraction-static = 0.88
     speculative-algorithm = DSPARK
     speculative-num-steps = 1
     speculative-eagle-topk = 1
     speculative-moe-a2a-backend = deepep
     speculative-moe-runner-backend = deep_gemm
-    max-running-requests = 128
+    max-running-requests = 160
     enable-metrics = true
-    swa-full-tokens-ratio = 0.55
+    swa-full-tokens-ratio = 0.15
     quantization = slimquant_marlin
     enable-dp-attention = true
     enable-dp-lm-head = true
@@ -204,37 +203,35 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     disaggregation-bootstrap-port = ${common:bootstrap_port}
     disaggregation-ib-device = ${common:ib_devices}
     enable-dp-attention-local-control-broadcast = true
-
     enable-cache-report = true
     tokenizer-backend = fastokens
 
     [global_prefill]
     # 不继承的脏环境(原脚本的 unset)
     unset_envs = SGLANG_PD_HIDDEN_POOL_TOKENS,SGLANG_PD_HIDDEN_RECV_POOL_TOKENS,PYTHONPYCACHEPREFIX,SGLANG_DEEPEP_BF16_DISPATCH
-    PYTORCH_ALLOC_CONF=expandable_segments:True
 
-    SGLANG_W4A8_EP_USE_GROUPGEMM=true
+    # --- pytorch / allocator ---
+    PYTORCH_ALLOC_CONF = expandable_segments:True
+
     SGLANG_HCU_MEGA_MOE_RUNTIME=megamoe
     SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK=4096
     SGLANG_MOE_COPY_WEIGHT_VIEWS_BEFORE_H2D=1
-    SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     PYTHONDONTWRITEBYTECODE=1
-
     # --- sglang runtime ---
     SGLANG_SET_CPU_AFFINITY = 1
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT = 1200
     SGLANG_USE_LIGHTOP = 1
     SGLANG_ROCM_USE_AITER_MOE = 1
     SGLANG_ROCM_USE_AITER_TILELANG_MHC = 1
-    SGLANG_GROUPGEMM = true
+    SGLANG_GROUPGEMM = True
     SGLANG_USE_FP8_W8A8_MOE = 0
     SGLANG_USE_LIGHTOP_EP_MOE_ALIGN = 1
     SGLANG_USE_LIGHTOP_EP_SCATTER = 1
     SGLANG_USE_LIGHTOP_EP_GATHER = 1
     SGLANG_USE_LIGHTOP_TOPK_IDS_POSTPROCESS = 1
     SGLANG_USE_LIGHTOP_GROUP_FP8_QUANT = 0
-    SGLANG_OPT_USE_FUSED_HASH_TOPK = true
-    SGLANG_OPT_USE_JIT_KERNEL_FUSED_TOPK = true
+    SGLANG_OPT_USE_FUSED_HASH_TOPK = True
+    SGLANG_OPT_USE_JIT_KERNEL_FUSED_TOPK = True
     SGLANG_TOPK_TRANSFORM_512_TORCH = false
     SGLANG_OPT_SWIGLU_CLAMP_FUSION = false
     SGLANG_JIT_DEEPGEMM_PRECOMPILE = 0
@@ -249,7 +246,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_USE_FUSED_DPSKV4_SILU_MUL_FP8_QUANT = 0
     SGLANG_APPLY_CONFIG_BACKUP = none
     SGLANG_USE_AITER_AG = 0
-    #SGLANG_W4A8_EP_USE_GROUPGEMM = true
+    SGLANG_W4A8_EP_USE_GROUPGEMM = True
     SGLANG_DSV4_HCU_INT8_INDEX_K_CACHE = 1
     SGLANG_OPT_FLASHMLA_SPARSE_PREFILL = 1
     SGLANG_DSV4_SPLIT_PREFILL_DECODE_MLA = 1
@@ -257,7 +254,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER = 0
     SGLANG_USE_W4A8_CONTIGUOUS_HIPC = 1
     SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE = false
-    SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
+    #SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
 
     SGLANG_LIGHTOP_TOPK = 1
     SGL_USE_LIGHTOP_TOPK_BACKAND = 2
@@ -275,10 +272,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     ROCSHMEM_TOPO_FILE_FORCE = ${common:topo_config}
     MC_ENABLE_DEST_DEVICE_AFFINITY = 1
     LD_LIBRARY_PATH = /usr/lib64:/usr/local/lib/python3.10/dist-packages/mooncake:/usr/local/lib/python3.10/dist-packages/mooncake_transfer_engine_shca.libs:$LD_LIBRARY_PATH
-    GLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
+
+
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
-
     [global_decode]
     # 不继承的脏环境
     unset_envs = SGLANG_PD_HIDDEN_POOL_TOKENS,SGLANG_PD_HIDDEN_RECV_POOL_TOKENS
@@ -291,10 +288,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     GLIBC_TUNABLES = glibc.rtld.optional_static_tls=0x40000
     SGLANG_LIGHTOP_TOPK = 1
     SGLANG_OPT_USE_FUSED_STORE_CACHE = false
-    SGLANG_OPT_USE_FUSED_HASH_TOPK = true
+    SGLANG_OPT_USE_FUSED_HASH_TOPK = True
     SGLANG_OPT_SWIGLU_CLAMP_FUSION = false
     SGLANG_TOPK_TRANSFORM_512_TORCH = false
-    SGLANG_OPT_USE_JIT_KERNEL_FUSED_TOPK = true
+    SGLANG_OPT_USE_JIT_KERNEL_FUSED_TOPK = True
     SGLANG_JIT_DEEPGEMM_PRECOMPILE = 0
     SGLANG_USE_AITER_AG = 0
     ROCSHMEM_DISABLE_HDP_FLUSH = 1
@@ -348,7 +345,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_TIMEOUT_KEEP_ALIVE=75
     ```
 
-    **启动顺序：**     按顺序启动 Prefill、Decode 和 Router。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
+    **启动顺序：** 按 Prefill、Decode、Router 的顺序启动。以下为脱敏后的已验证脚本。
 
     ### 1.3 sglang_serve_prefill_<PREFILL_NODE_IP>.sh
 
@@ -358,11 +355,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     unset PYTHONPYCACHEPREFIX
     unset SGLANG_DEEPEP_BF16_DISPATCH
     export PYTORCH_ALLOC_CONF=expandable_segments:True
-    export SGLANG_W4A8_EP_USE_GROUPGEMM=True
     export SGLANG_HCU_MEGA_MOE_RUNTIME=megamoe
     export SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK=4096
     export SGLANG_MOE_COPY_WEIGHT_VIEWS_BEFORE_H2D=1
-    export SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     export PYTHONDONTWRITEBYTECODE=1
     export SGLANG_SET_CPU_AFFINITY=1
     export SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT=1200
@@ -392,6 +387,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_USE_FUSED_DPSKV4_SILU_MUL_FP8_QUANT=0
     export SGLANG_APPLY_CONFIG_BACKUP=none
     export SGLANG_USE_AITER_AG=0
+    export SGLANG_W4A8_EP_USE_GROUPGEMM=True
     export SGLANG_DSV4_HCU_INT8_INDEX_K_CACHE=1
     export SGLANG_OPT_FLASHMLA_SPARSE_PREFILL=1
     export SGLANG_DSV4_SPLIT_PREFILL_DECODE_MLA=1
@@ -399,7 +395,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER=0
     export SGLANG_USE_W4A8_CONTIGUOUS_HIPC=1
     export SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE=False
-    export SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER=1
     export SGLANG_LIGHTOP_TOPK=1
     export SGL_USE_LIGHTOP_TOPK_BACKAND=2
     export SGLANG_LIGHTOP_KVALLOC_KERNEL=1
@@ -414,22 +409,25 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export ROCSHMEM_TOPO_FILE_FORCE=/guofy/packages/DS-V4-W4A8/config/topo.config
     export MC_ENABLE_DEST_DEVICE_AFFINITY=1
     export LD_LIBRARY_PATH=/usr/lib64:/usr/local/lib/python3.10/dist-packages/mooncake:/usr/local/lib/python3.10/dist-packages/mooncake_transfer_engine_shca.libs:$LD_LIBRARY_PATH
-    export GLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
+        --reasoning-parser deepseek-v4 \
+        --enable-strict-thinking \
+        --tool-call-parser deepseekv4 \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
+        --trust-remote-code \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
         --quantization slimquant_marlin \
-        --trust-remote-code \
         --host 0.0.0.0 \
         --port 30001 \
         --tp-size 8 \
         --pp-size 1 \
-        --dp 1 \
+        --dp 8 \
         --ep 8 \
-        --enable-prefill-cp \
-        --cp-strategy interleave \
+        --enable-dp-attention \
+        --enable-dp-lm-head \
+        --enable-dp-attention-local-control-broadcast \
         --moe-dense-tp-size 1 \
         --moe-a2a-backend megamoe \
         --moe-runner-backend auto \
@@ -441,7 +439,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --node-rank 0 \
         --dist-timeout 10000 \
         --watchdog-timeout 3600 \
-        --max-total-tokens 1788918 \
         --disaggregation-mode prefill \
         --disaggregation-transfer-backend mooncake \
         --disaggregation-bootstrap-port 8998 \
@@ -456,20 +453,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 96 \
-        --reasoning-parser deepseek-v4 \
-        --tool-call-parser deepseekv4 \
+        --max-running-requests 48 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
         --enable-metrics \
         --enable-request-time-stats-logging \
-        --disable-overlap-schedule \
-        --enable-cp-cache-layer-split \
-        --cuda-graph-backend-prefill disabled \
         --enable-cache-report \
         --tokenizer-backend fastokens \
-    > 20261005_145653_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 1.4 sglang_serve_decode_<DECODE_NODE_IP>.sh
@@ -559,15 +551,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-total-tokens 950000 \
         --disable-flashinfer-autotune \
         --cuda-graph-max-bs 8 \
-        --mem-fraction-static 0.85 \
+        --mem-fraction-static 0.88 \
         --speculative-algorithm DSPARK \
         --speculative-num-steps 1 \
         --speculative-eagle-topk 1 \
         --speculative-moe-a2a-backend deepep \
         --speculative-moe-runner-backend deep_gemm \
-        --max-running-requests 128 \
+        --max-running-requests 160 \
         --enable-metrics \
-        --swa-full-tokens-ratio 0.55 \
+        --swa-full-tokens-ratio 0.15 \
         --quantization slimquant_marlin \
         --enable-dp-attention \
         --enable-dp-lm-head \
@@ -583,7 +575,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable-dp-attention-local-control-broadcast \
         --enable-cache-report \
         --tokenizer-backend fastokens \
-    > 20261005_145653_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 1.5 router.sh
@@ -601,12 +593,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20261005_145653_router.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 1.6 运行边界与已知问题
 
-    当前页面展示的是脱敏后的部署示例；本页不记录性能结论，且尚未在本页面发现需要附加的运行问题记录。
+    GPU-only 不启动 Mooncake master/client；`/v1/models` 不应作为唯一就绪判断。
 
     ## 2. CPU（L1 + L3）
 
@@ -614,11 +606,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     | 项目 | 值 |
     | --- | --- |
-    | 证据 | 已验证 Run 快照（内部路径已脱敏） |
-    | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP1 / EP8`，开启 CP（`interleave`） |
+    | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
     | Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
     | 缓存层级 | GPU（L1）+ Mooncake CPU 内存（L3）；未启用 DFS / Offload |
-    | Mooncake client | `global_segment_size=200GB` |
+    | Mooncake client | P 节点，`global_segment_size=240GB` |
     | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
 
     ### 2.2 自动化配置
@@ -627,7 +618,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # PD 分离部署配置（内部工作路径已脱敏）
     # 拓扑: P=<PREFILL_NODE_IP>（CP8EP8，8 卡）；D=<DECODE_NODE_IP>（TP8DP8，8 卡）；Router 位于 P 节点的 10015 端口
     # 变量引用语法: ${common:xxx} 由框架在解析时展开;值内 bash 语法($VAR/$((..)))原样透传
-    # overlap - ;read plan + ;split+
+    #脚本状态:kaiqi读聚合; 桶大小4G ;8G内存 ; OVERLAP -
 
     [common]
     # --- 模型与端口 ---
@@ -641,10 +632,11 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # 各角色节点IP,换节点只改对应一行;dist_init_addr的ib地址与以太地址无固定规则,需手动对应改
     p_node_ip = <PREFILL_NODE_IP>
     d_node_ip = <DECODE_NODE_IP>
+    # mooncake client所在节点(当前与P同节点;client不必须在P上)
     mc_node_ip = <PREFILL_NODE_IP>
     ib_devices = shca_0,shca_1,shca_2,shca_3
-    p_dist_init_addr =  <PREFILL_DIST_INIT_ADDR>
-    d_dist_init_addr =  <DECODE_DIST_INIT_ADDR>
+    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
+    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
 
@@ -659,9 +651,11 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     enable_http_metadata_server = true
     eviction_ratio = 0.1
 
+
+
     [mooncake_client]
     host = ${common:mc_node_ip}
-    global_segment_size = 200GB
+    global_segment_size = 240GB
     master_server_address = ${common:p_node_ip}:50051
     metadata_server = P2PHANDSHAKE
     protocol = rdma
@@ -670,6 +664,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     logtostderr = true
     enable_http_server = true
     http_port = 9300
+
 
     [mooncake_client_global]
     MOONCAKE_LOCAL_HOSTNAME = ${common:mc_node_ip}
@@ -693,22 +688,26 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     log-level = info
 
     [sglang_prefill]
-    # --- Prefill: CP8EP8 PP1 + DSPARK (03_p_24.sh) ---
+    reasoning-parser = deepseek-v4
+    enable-strict-thinking = true
+    tool-call-parser = deepseekv4
     model-path = ${common:model_path}
+    trust-remote-code = True
     model-loader-extra-config = ${common:model_loader_config}
     quantization = slimquant_marlin
-    trust-remote-code = True
     host = 0.0.0.0
     port = ${common:sglang_port}
     tp-size = 8
     pp-size = 1
-    dp = 1
+    dp = 8
     ep = 8
-    enable-prefill-cp = true
-    cp-strategy = interleave
+    enable-dp-attention = true
+    enable-dp-lm-head = true
+    enable-dp-attention-local-control-broadcast= true
     moe-dense-tp-size = 1
     moe-a2a-backend = megamoe
     moe-runner-backend = auto
+    init-expert-location =/guofy/packages/DS-V4-W4A8/need/placement_candidate.json
     deepep-mode = normal
     deepep-config = ${common:deepep_config}
     dist-init-addr = ${common:p_dist_init_addr}
@@ -716,7 +715,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     node-rank = 0
     dist-timeout = 10000
     watchdog-timeout = 3600
-    max-total-tokens = 1788928
+    #max-total-tokens = 1788928
     disaggregation-mode = prefill
     disaggregation-transfer-backend = mooncake
     disaggregation-bootstrap-port = ${common:bootstrap_port}
@@ -731,26 +730,26 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 96
-    reasoning-parser = deepseek-v4
-    tool-call-parser = deepseekv4
+    max-running-requests = 48
+
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
     tokenizer-worker-num = 8
     enable-metrics = true
-    enable-unified-cache-external-linker = true
     enable-request-time-stats-logging = true
+    enable-unified-cache-external-linker = true
     unified-cache-external-linker-backend = mooncake
-    #mooncake-enable-page-wise-load = true
-    #mooncake-page-wise-load-threshold = 1
-    #mooncake-dfs-replica-num = 0
-    #LAYER-SPLIT
-    enable-cp-cache-layer-split = true
-    cuda-graph-backend-prefill = disabled
-    disable-overlap-schedule = true
-    init-expert-location =/guofy/packages/DS-V4-W4A8/need/placement_candidate.json
-    tokenizer-backend = fastokens
+
+    # mooncake-enable-page-wise-load = true
+    # disable-overlap-schedule = true
+
+    # 恒远新增优化0921_1520 dp不支持
+    #mooncake-enable-waiting-queue-dfs-prefetch = true
+    #mooncake-waiting-queue-dfs-prefetch-workers = 4
+    #mooncake-waiting-queue-dfs-prefetch-max-requests = 48
+    #mooncake-waiting-queue-dfs-prefetch-max-bytes= 4294967296
     enable-cache-report = true
+    tokenizer-backend = fastokens
 
     [sglang_decode]
     # --- Decode: TP8DP8 EP8 + DSPARK + LL deepep (04_d_10.sh) ---
@@ -796,8 +795,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     disaggregation-bootstrap-port = ${common:bootstrap_port}
     disaggregation-ib-device = ${common:ib_devices}
     enable-dp-attention-local-control-broadcast = true
-    tokenizer-backend = fastokens
     enable-cache-report = true
+    tokenizer-backend = fastokens
 
     [global_prefill]
     # 不继承的脏环境(原脚本的 unset)
@@ -810,12 +809,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK=4096
     SGLANG_MOE_COPY_WEIGHT_VIEWS_BEFORE_H2D=1
     PYTHONDONTWRITEBYTECODE=1
-
     # --- sglang runtime ---
     SGLANG_SET_CPU_AFFINITY = 1
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT = 1200
     SGLANG_USE_LIGHTOP = 1
     SGLANG_ROCM_USE_AITER_MOE = 1
+    SGLANG_ROCM_USE_AITER_TILELANG_MHC = 1
     SGLANG_GROUPGEMM = True
     SGLANG_USE_FP8_W8A8_MOE = 0
     SGLANG_USE_LIGHTOP_EP_MOE_ALIGN = 1
@@ -847,7 +846,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER = 0
     SGLANG_USE_W4A8_CONTIGUOUS_HIPC = 1
     SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE = false
-    SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
+    #SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
 
     SGLANG_LIGHTOP_TOPK = 1
     SGL_USE_LIGHTOP_TOPK_BACKAND = 2
@@ -879,24 +878,20 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MC_IB_PCI_RELAXED_ORDERING = 0
     MC_TRANSFER_TIMEOUT = 30
     MC_SLICE_SIZE = 1048576
+    #MOONCAKE_OFFLOAD_LOCAL_BUFFER_SIZE_BYTES = ${common:local_buffer_bytes}
 
-    MC_STORE_ENABLE_SESSION_CACHE = 0
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
-    MC_STORE_DFS_READ_TRACE = 1
     SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
-
     SGLANG_MOONCAKE_READ_PLAN=1
-
-    SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
     SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     MC_STORE_CLIENT_METRIC=0
 
     MC_STORE_MEMCPY=1
-    MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=6442450944
+    MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
+
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
+
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
-
     [global_decode]
     # 不继承的脏环境
     unset_envs = SGLANG_PD_HIDDEN_POOL_TOKENS,SGLANG_PD_HIDDEN_RECV_POOL_TOKENS
@@ -962,13 +957,13 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     SGLANG_ENABLE_UNIFIED_RADIX_TREE = 1
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
-    TOKENS_BPE_THREADS=1
+    FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
     ```
 
-    **启动顺序：**     按 Mooncake master、Mooncake client、Prefill、Decode、Router 的顺序启动。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
+    **启动顺序：** 按 Mooncake master、Mooncake client、Prefill、Decode、Router 的顺序启动。以下为脱敏后的已验证脚本。
 
-    ### 2.3 `mooncake_master.sh`
+    ### 2.3 mooncake_master.sh
 
     ```bash
     nohup mooncake_master \
@@ -976,7 +971,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --eviction_high_watermark_ratio=0.8 \
         --enable_http_metadata_server \
         --eviction_ratio=0.1 \
-    > 20261005_141953_mooncake_master.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 2.4 mooncake_client_<PREFILL_NODE_IP>.sh
@@ -988,7 +983,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_ENABLE_DFS_PREFETCH=0
     nohup mooncake_client \
         --host=<PREFILL_NODE_IP> \
-        --global_segment_size=200GB \
+        --global_segment_size=240GB \
         --master_server_address=<PREFILL_NODE_IP>:50051 \
         --metadata_server=P2PHANDSHAKE \
         --protocol=rdma \
@@ -997,7 +992,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --logtostderr \
         --enable_http_server \
         --http_port=9300 \
-    > 20261005_141953_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 2.5 sglang_serve_prefill_<PREFILL_NODE_IP>.sh
@@ -1016,6 +1011,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT=1200
     export SGLANG_USE_LIGHTOP=1
     export SGLANG_ROCM_USE_AITER_MOE=1
+    export SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
     export SGLANG_GROUPGEMM=True
     export SGLANG_USE_FP8_W8A8_MOE=0
     export SGLANG_USE_LIGHTOP_EP_MOE_ALIGN=1
@@ -1047,7 +1043,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER=0
     export SGLANG_USE_W4A8_CONTIGUOUS_HIPC=1
     export SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE=False
-    export SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER=1
     export SGLANG_LIGHTOP_TOPK=1
     export SGL_USE_LIGHTOP_TOPK_BACKAND=2
     export SGLANG_LIGHTOP_KVALLOC_KERNEL=1
@@ -1073,35 +1068,36 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_IB_PCI_RELAXED_ORDERING=0
     export MC_TRANSFER_TIMEOUT=30
     export MC_SLICE_SIZE=1048576
-    export MC_STORE_ENABLE_SESSION_CACHE=0
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
-    export MC_STORE_DFS_READ_TRACE=1
     export SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
     export SGLANG_MOONCAKE_READ_PLAN=1
-    export SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
     export SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     export MC_STORE_CLIENT_METRIC=0
     export MC_STORE_MEMCPY=1
-    export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=6442450944
+    export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
+        --reasoning-parser deepseek-v4 \
+        --enable-strict-thinking \
+        --tool-call-parser deepseekv4 \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
+        --trust-remote-code \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
         --quantization slimquant_marlin \
-        --trust-remote-code \
         --host 0.0.0.0 \
         --port 30001 \
         --tp-size 8 \
         --pp-size 1 \
-        --dp 1 \
+        --dp 8 \
         --ep 8 \
-        --enable-prefill-cp \
-        --cp-strategy interleave \
+        --enable-dp-attention \
+        --enable-dp-lm-head \
+        --enable-dp-attention-local-control-broadcast \
         --moe-dense-tp-size 1 \
         --moe-a2a-backend megamoe \
         --moe-runner-backend auto \
+        --init-expert-location /guofy/packages/DS-V4-W4A8/need/placement_candidate.json \
         --deepep-mode normal \
         --deepep-config /guofy/packages/DS-V4-W4A8/config/deepep_config.json \
         --dist-init-addr <PREFILL_DIST_INIT_ADDR> \
@@ -1109,7 +1105,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --node-rank 0 \
         --dist-timeout 10000 \
         --watchdog-timeout 3600 \
-        --max-total-tokens 1788928 \
         --disaggregation-mode prefill \
         --disaggregation-transfer-backend mooncake \
         --disaggregation-bootstrap-port 8998 \
@@ -1124,23 +1119,17 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 96 \
-        --reasoning-parser deepseek-v4 \
-        --tool-call-parser deepseekv4 \
+        --max-running-requests 48 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
         --enable-metrics \
-        --enable-unified-cache-external-linker \
         --enable-request-time-stats-logging \
+        --enable-unified-cache-external-linker \
         --unified-cache-external-linker-backend mooncake \
-        --enable-cp-cache-layer-split \
-        --cuda-graph-backend-prefill disabled \
-        --disable-overlap-schedule \
-        --init-expert-location /guofy/packages/DS-V4-W4A8/need/placement_candidate.json \
-        --tokenizer-backend fastokens \
         --enable-cache-report \
-    > 20261005_141953_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+        --tokenizer-backend fastokens \
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 2.6 sglang_serve_decode_<DECODE_NODE_IP>.sh
@@ -1207,7 +1196,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export LD_LIBRARY_PATH=/usr/lib64:/usr/local/lib/python3.10/dist-packages/mooncake:/usr/local/lib/python3.10/dist-packages/mooncake_transfer_engine_shca.libs:$LD_LIBRARY_PATH
     export SGLANG_ENABLE_UNIFIED_RADIX_TREE=1
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
-    export TOKENS_BPE_THREADS=1
+    export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
@@ -1252,9 +1241,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --disaggregation-bootstrap-port 8998 \
         --disaggregation-ib-device shca_0,shca_1,shca_2,shca_3 \
         --enable-dp-attention-local-control-broadcast \
-        --tokenizer-backend fastokens \
         --enable-cache-report \
-    > 20261005_141953_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+        --tokenizer-backend fastokens \
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 2.7 router.sh
@@ -1272,30 +1261,28 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20261005_141953_router.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
     ```
 
     ### 2.8 运行边界与已知问题
 
-    当前页面展示的是脱敏后的部署示例；本页不记录性能结论，且尚未在本页面发现需要附加的运行问题记录。
+    CPU 方案通过 Mooncake CPU segment 与 external linker 提供 L3 缓存。P/D 两端应启用 cache report，并结合真实请求链路解释命中率。
 
     ## 3. DFS（L1 + L3 + L4）
-
-    以下是 目标 P / D 节点 的 Mooncake DFS 脚本归档。DFS 方案保留既有完整说明与风险记录。
 
     ### 3.1 已归档 Run
 
     | 项目 | 值 |
     | --- | --- |
     | 证据 | 已验证 Run 快照（内部路径已脱敏） |
-    | 部署形态 | Prefill / Decode 分离，Mooncake RDMA + DFS |
+    | 部署形态 | Prefill / Decode 分离，Mooncake RDMA + DFS + SSD Offload |
     | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP1 / EP8`，开启 CP（`interleave`） |
     | Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
-    | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
-    | 框架 case | `cases/2-sglang-perf/204-pd-multi-turn-qa_1000.py` |
-    | 配置来源 | `sglang_conf/DeepSeek-V4-W4A8-CP8EP8-PD/03_mooncake_pd_dfs_parastor_1516_hy_80G_4G_10T_48bf.conf` |
+    | Mooncake client | P 节点；`global_segment_size=8GB` |
+    | DFS 根目录 | `<DFS_ROOT>` |
     | Router | P 节点，监听 `10015` |
     | SGLang | P/D 均监听 `30001`；bootstrap 端口 `8998` |
+    | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
 
     ### 3.2 自动化配置
 
@@ -1317,15 +1304,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # 各角色节点IP,换节点只改对应一行;dist_init_addr的ib地址与以太地址无固定规则,需手动对应改
     p_node_ip = <PREFILL_NODE_IP>
     d_node_ip = <DECODE_NODE_IP>
+    # mooncake client所在节点(当前与P同节点;client不必须在P上)
     mc_node_ip = <PREFILL_NODE_IP>
     ib_devices = shca_0,shca_1,shca_2,shca_3
-    p_dist_init_addr =  <PREFILL_DIST_INIT_ADDR>
-    d_dist_init_addr =  <DECODE_DIST_INIT_ADDR>
+    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
+    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
-
+    # --- DFS 存储（已脱敏的根目录；容量按当前配置计算）
     dfs_root = <DFS_ROOT>
-
     dfs_bucket_capacity = 4294967296
     dfs_max_bucket_count = 5120
     local_buffer_bytes = 21474836480
@@ -1362,7 +1349,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     [mooncake_client]
     host = ${common:mc_node_ip}
-    global_segment_size = 80GB
+    global_segment_size = 8GB
     local_buffer_size = 4GB
     master_server_address = ${common:p_node_ip}:50051
     metadata_server = P2PHANDSHAKE
@@ -1410,19 +1397,22 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     log-level = info
 
     [sglang_prefill]
-    # --- Prefill: CP8EP8 PP1 + DSPARK (03_p_24.sh) ---
+    reasoning-parser = deepseek-v4
+    enable-strict-thinking = true
+    tool-call-parser = deepseekv4
     model-path = ${common:model_path}
+    trust-remote-code = True
     model-loader-extra-config = ${common:model_loader_config}
     quantization = slimquant_marlin
-    trust-remote-code = True
     host = 0.0.0.0
     port = ${common:sglang_port}
     tp-size = 8
     pp-size = 1
-    dp = 1
+    dp = 8
     ep = 8
-    enable-prefill-cp = true
-    cp-strategy = interleave
+    enable-dp-attention = true
+    enable-dp-lm-head = true
+    enable-dp-attention-local-control-broadcast= true
     moe-dense-tp-size = 1
     moe-a2a-backend = megamoe
     moe-runner-backend = auto
@@ -1434,8 +1424,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     node-rank = 0
     dist-timeout = 10000
     watchdog-timeout = 3600
-    max-total-tokens = 1788928
-    #max-total-tokens = 3577856
+    #max-total-tokens = 1788928
     disaggregation-mode = prefill
     disaggregation-transfer-backend = mooncake
     disaggregation-bootstrap-port = ${common:bootstrap_port}
@@ -1450,32 +1439,24 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 96
-    reasoning-parser = deepseek-v4
-    tool-call-parser = deepseekv4
+    max-running-requests = 48
+
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
     tokenizer-worker-num = 8
     enable-metrics = true
-    enable-unified-cache-external-linker = true
     enable-request-time-stats-logging = true
+    enable-unified-cache-external-linker = true
     unified-cache-external-linker-backend = mooncake
-    mooncake-enable-page-wise-load = true
-    mooncake-page-wise-load-threshold = 1
 
-    enable-cp-cache-layer-split = true
-    cuda-graph-backend-prefill = disabled
+    mooncake-enable-page-wise-load = true
     disable-overlap-schedule = true
 
     # 恒远新增优化0921_1520
-    mooncake-enable-waiting-queue-dfs-prefetch = true
-    mooncake-waiting-queue-dfs-prefetch-workers = 4
-    mooncake-waiting-queue-dfs-prefetch-max-requests = 48
-    mooncake-waiting-queue-dfs-prefetch-max-bytes= 4294967296
-    #mooncake-waiting-queue-dfs-prefetch-max-bytes= 1048576
-    #mooncake-waiting-queue-dfs-prefetch-policy = wait_complete
-    enable-cache-report = true
-    tokenizer-backend = fastokens
+    #mooncake-enable-waiting-queue-dfs-prefetch = true
+    #mooncake-waiting-queue-dfs-prefetch-workers = 4
+    #mooncake-waiting-queue-dfs-prefetch-max-requests = 48
+    #mooncake-waiting-queue-dfs-prefetch-max-bytes= 4294967296
 
     [sglang_decode]
     # --- Decode: TP8DP8 EP8 + DSPARK + LL deepep (04_d_10.sh) ---
@@ -1521,8 +1502,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     disaggregation-bootstrap-port = ${common:bootstrap_port}
     disaggregation-ib-device = ${common:ib_devices}
     enable-dp-attention-local-control-broadcast = true
-    tokenizer-backend = fastokens
-    enable-cache-report = true
 
     [global_prefill]
     # 不继承的脏环境(原脚本的 unset)
@@ -1572,7 +1551,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER = 0
     SGLANG_USE_W4A8_CONTIGUOUS_HIPC = 1
     SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE = false
-    SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
+    #SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER = 1
 
     SGLANG_LIGHTOP_TOPK = 1
     SGL_USE_LIGHTOP_TOPK_BACKAND = 2
@@ -1626,28 +1605,19 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_DFS_FORCE_ONE_REPLICA = True
 
     MC_STORE_DFS_H2D_KERNEL=1
-    # MC_STORE_DFS_PINNED_POOL_BYTES=6442450944
     MC_STORE_DFS_PINNED_POOL_BYTES=8589934592
     MOONCAKE_DFS_BATCH_READ_MERGE_ENABLED=1
 
     SGLANG_MOONCAKE_READ_PLAN=1
-
     SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
 
     MC_STORE_CLIENT_METRIC=0
-    #MOONCAKE_DFS_KEY_DUMP=<DFS_ROOT>/key_dump
-    #MC_STORE_DFS_READ_IO_SIZE_METRIC=1
 
     MC_STORE_MEMCPY=1
     MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
-
     MC_STORE_DFS_PREFETCH_ARENA_SIZE_BYTES=6442450944
-    # 恒远调试
-    #SGLANG_MOONCAKE_PREFETCH_DEBUG=1
-    #SGLANG_DAS_PREFETCH_TRACE=1
+
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
-    FASTOKENS_BPE_THREADS=1
-    SGLANG_TIMEOUT_KEEP_ALIVE=75
 
     [global_decode]
     # 不继承的脏环境
@@ -1714,18 +1684,11 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     SGLANG_ENABLE_UNIFIED_RADIX_TREE = 1
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
-    FASTOKENS_BPE_THREADS=1
-    SGLANG_TIMEOUT_KEEP_ALIVE=75
+
     ```
 
-    **启动顺序：**     以下为经过脱敏后的部署示例。建议按下列顺序启动：
+    **启动顺序：** Mooncake master → Mooncake client → Prefill SGLang → Decode SGLang → PD Router。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
 
-    1. 在 P 节点启动 Mooncake master。
-    2. 在 P 节点启动 Mooncake client。
-    3. 在 P 节点启动 Prefill SGLang 服务。
-    4. 在 D 节点启动 Decode SGLang 服务。
-    5. 在 P 节点启动 PD Router。
-    6. 服务就绪后，通过框架执行 `204-pd-multi-turn-qa_1000.py`。
     ### 3.3 Mooncake master（P）
 
     ```bash
@@ -1751,7 +1714,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_metadata_server \
         --eviction_ratio=0.1 \
         --enable_offload=true \
-    > 20261005_004919_mooncake_master.log 2>&1 &
+    > 20260929_192911_mooncake_master.log 2>&1 &
+
     ```
 
     ### 3.4 Mooncake client（P）
@@ -1776,7 +1740,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     nohup mooncake_client \
         --host=<PREFILL_NODE_IP> \
-        --global_segment_size=80GB \
+        --global_segment_size=8GB \
         --local_buffer_size=4GB \
         --master_server_address=<PREFILL_NODE_IP>:50051 \
         --metadata_server=P2PHANDSHAKE \
@@ -1787,7 +1751,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_server \
         --http_port=9300 \
         --enable_offload=true \
-    > 20261005_004919_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20260929_192911_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.5 Prefill SGLang（P）
@@ -1838,7 +1803,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_DSV4_HCU_USE_LIGHTOP_BF16_GATHER=0
     export SGLANG_USE_W4A8_CONTIGUOUS_HIPC=1
     export SGLANG_USE_LIGHTOP_W4A8_MARLIN_MOE=False
-    export SGLANG_DISAGGREGATION_ALL_CP_RANKS_TRANSFER=1
     export SGLANG_LIGHTOP_TOPK=1
     export SGL_USE_LIGHTOP_TOPK_BACKAND=2
     export SGLANG_LIGHTOP_KVALLOC_KERNEL=1
@@ -1893,21 +1857,23 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     export MC_STORE_DFS_PREFETCH_ARENA_SIZE_BYTES=6442450944
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
-    export FASTOKENS_BPE_THREADS=1
-    export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
+        --reasoning-parser deepseek-v4 \
+        --enable-strict-thinking \
+        --tool-call-parser deepseekv4 \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
+        --trust-remote-code \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
         --quantization slimquant_marlin \
-        --trust-remote-code \
         --host 0.0.0.0 \
         --port 30001 \
         --tp-size 8 \
         --pp-size 1 \
-        --dp 1 \
+        --dp 8 \
         --ep 8 \
-        --enable-prefill-cp \
-        --cp-strategy interleave \
+        --enable-dp-attention \
+        --enable-dp-lm-head \
+        --enable-dp-attention-local-control-broadcast \
         --moe-dense-tp-size 1 \
         --moe-a2a-backend megamoe \
         --moe-runner-backend auto \
@@ -1919,7 +1885,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --node-rank 0 \
         --dist-timeout 10000 \
         --watchdog-timeout 3600 \
-        --max-total-tokens 1788928 \
         --disaggregation-mode prefill \
         --disaggregation-transfer-backend mooncake \
         --disaggregation-bootstrap-port 8998 \
@@ -1934,28 +1899,18 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 96 \
-        --reasoning-parser deepseek-v4 \
-        --tool-call-parser deepseekv4 \
+        --max-running-requests 48 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
         --enable-metrics \
-        --enable-unified-cache-external-linker \
         --enable-request-time-stats-logging \
+        --enable-unified-cache-external-linker \
         --unified-cache-external-linker-backend mooncake \
         --mooncake-enable-page-wise-load \
-        --mooncake-page-wise-load-threshold 1 \
-        --enable-cp-cache-layer-split \
-        --cuda-graph-backend-prefill disabled \
         --disable-overlap-schedule \
-        --mooncake-enable-waiting-queue-dfs-prefetch \
-        --mooncake-waiting-queue-dfs-prefetch-workers 4 \
-        --mooncake-waiting-queue-dfs-prefetch-max-requests 48 \
-        --mooncake-waiting-queue-dfs-prefetch-max-bytes 4294967296 \
-        --enable-cache-report \
-        --tokenizer-backend fastokens \
-    > 20261005_004919_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20260929_192911_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.6 Decode SGLang（D）
@@ -2022,8 +1977,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export LD_LIBRARY_PATH=/usr/lib64:/usr/local/lib/python3.10/dist-packages/mooncake:/usr/local/lib/python3.10/dist-packages/mooncake_transfer_engine_shca.libs:$LD_LIBRARY_PATH
     export SGLANG_ENABLE_UNIFIED_RADIX_TREE=1
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
-    export FASTOKENS_BPE_THREADS=1
-    export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -2067,9 +2020,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --disaggregation-bootstrap-port 8998 \
         --disaggregation-ib-device shca_0,shca_1,shca_2,shca_3 \
         --enable-dp-attention-local-control-broadcast \
-        --tokenizer-backend fastokens \
-        --enable-cache-report \
-    > 20261005_004919_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+    > 20260929_192911_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.7 PD Router（P）
@@ -2087,22 +2039,13 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20261005_004919_router.log 2>&1 &
+    > 20260929_192911_router.log 2>&1 &
+
     ```
 
     ### 3.8 运行边界与已知问题
 
-    !!! danger "此 Run 不能标为完整成功基线"
-
-        该目录包含约 58 GiB 的 core 文件。对 `131072` 长上下文的执行曾触发 Mooncake `DfsAsyncScatter` 的堆损坏 / abort；因此不能将该历史 run，尤其是 131072 场景，视为生产可用或完全成功的性能基线。
-
-    - 本页展示的是脱敏后的配置与脚本示例，不保证它们可以在当前环境直接复现。
-    - Mooncake DFS 根目录、NIC 名、容器动态库、模型路径和 IP 均为 目标 P / D 节点 环境专用配置，迁移前必须逐项替换并验证。
-    - Router 的 `/v1/models` 就绪检查可能先于真正可用状态返回；跑 benchmark 前需额外确认 P/D 服务、bootstrap 和实际请求链路均已就绪。
+    - 本页展示的是脱敏后的配置与脚本示例，不保证其可以在当前环境直接复现。
+    - DFS 根目录、NIC 名、容器动态库、模型路径与 IP 均为 目标 P / D 节点 环境专用配置，迁移前必须逐项替换并验证。
+    - Router 的 `/v1/models` 就绪检查可能先于真正可用状态返回；跑工作负载前需额外确认 P/D 服务、bootstrap 和实际请求链路均已就绪。
     - `--enable-cache-report` 已同时出现在 P 与 D 服务脚本中；命中率解释仍应结合请求侧结果与服务端日志核对。
-
-=== "IFB"
-
-    !!! note "待补充"
-
-        暂无经过验证的 IFB 启动脚本、配置、服务验证方法或性能基线。后续新增时，应单独归档脚本快照、版本指纹、验证结果与 Run 证据，避免与 PD 分离参数混用。
