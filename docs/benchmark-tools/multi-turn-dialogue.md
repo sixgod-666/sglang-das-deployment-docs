@@ -17,10 +17,12 @@ python3 bench_multiturn.py \
   --disable-random-sample --seed 1 \
   --num-clients 32 --num-rounds 15 --max-parallel 32 \
   --request-length 65536 --sub-question-input-length 512 \
-  --output-length 1 --request-rate 16 \
+  --output-length 1 --request-rate 16  --repeat-count 2 \
   --ready-queue-policy random --enable-round-barrier --disable-auto-run \
   --model-path <MODEL_PATH> \
   --host <HOST> --port <PORT> \
+  --api-format openai \
+  --cache-size-path <CACHE_SIZE_PATH> \
   --log-file multi_turn_result.jsonl
 ```
 

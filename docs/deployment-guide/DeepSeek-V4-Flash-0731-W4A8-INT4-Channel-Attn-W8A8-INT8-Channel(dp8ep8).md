@@ -148,7 +148,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 48
+    max-running-requests = 128
 
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
@@ -453,7 +453,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 48 \
+        --max-running-requests 128 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
@@ -730,7 +730,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 48
+    max-running-requests = 128
 
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
@@ -1119,7 +1119,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 48 \
+        --max-running-requests 128 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
@@ -1439,7 +1439,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 48
+    max-running-requests = 128
 
     kv-cache-dtype = auto
     disable-flashinfer-autotune = true
@@ -1909,7 +1909,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 48 \
+        --max-running-requests 128 \
         --kv-cache-dtype auto \
         --disable-flashinfer-autotune \
         --tokenizer-worker-num 8 \
