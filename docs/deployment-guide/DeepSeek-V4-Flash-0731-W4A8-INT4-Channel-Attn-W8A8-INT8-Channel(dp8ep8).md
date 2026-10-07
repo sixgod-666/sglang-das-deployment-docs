@@ -1270,7 +1270,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     ## 3. DFS（L1 + L3 + L4）
 
-    ### 3.1 已归档 Run
+    ### 3.1 部署方式
 
     | 项目 | 值 |
     | --- | --- |
@@ -1457,6 +1457,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     #mooncake-waiting-queue-dfs-prefetch-workers = 4
     #mooncake-waiting-queue-dfs-prefetch-max-requests = 48
     #mooncake-waiting-queue-dfs-prefetch-max-bytes= 4294967296
+    enable-cache-report = true
+    tokenizer-backend = fastokens
 
     [sglang_decode]
     # --- Decode: TP8DP8 EP8 + DSPARK + LL deepep (04_d_10.sh) ---
@@ -1502,6 +1504,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     disaggregation-bootstrap-port = ${common:bootstrap_port}
     disaggregation-ib-device = ${common:ib_devices}
     enable-dp-attention-local-control-broadcast = true
+    enable-cache-report = true
+    tokenizer-backend = fastokens
 
     [global_prefill]
     # 不继承的脏环境(原脚本的 unset)
@@ -1618,6 +1622,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MC_STORE_DFS_PREFETCH_ARENA_SIZE_BYTES=6442450944
 
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
+    FASTOKENS_BPE_THREADS=1
+    SGLANG_TIMEOUT_KEEP_ALIVE=75
 
     [global_decode]
     # 不继承的脏环境
@@ -1684,6 +1690,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     SGLANG_ENABLE_UNIFIED_RADIX_TREE = 1
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
+    FASTOKENS_BPE_THREADS=1
+    SGLANG_TIMEOUT_KEEP_ALIVE=75
 
     ```
 
@@ -1714,7 +1722,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_metadata_server \
         --eviction_ratio=0.1 \
         --enable_offload=true \
-    > 20260929_192911_mooncake_master.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
 
     ```
 
@@ -1751,7 +1759,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_server \
         --http_port=9300 \
         --enable_offload=true \
-    > 20260929_192911_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
 
     ```
 
@@ -1857,6 +1865,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     export MC_STORE_DFS_PREFETCH_ARENA_SIZE_BYTES=6442450944
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
+    export FASTOKENS_BPE_THREADS=1
+    export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --enable-strict-thinking \
@@ -1909,7 +1919,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --unified-cache-external-linker-backend mooncake \
         --mooncake-enable-page-wise-load \
         --disable-overlap-schedule \
-    > 20260929_192911_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+        --enable-cache-report \
+        --tokenizer-backend fastokens \
+    > <LOG_FILE> 2>&1 &
 
     ```
 
@@ -1977,6 +1989,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export LD_LIBRARY_PATH=/usr/lib64:/usr/local/lib/python3.10/dist-packages/mooncake:/usr/local/lib/python3.10/dist-packages/mooncake_transfer_engine_shca.libs:$LD_LIBRARY_PATH
     export SGLANG_ENABLE_UNIFIED_RADIX_TREE=1
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
+    export FASTOKENS_BPE_THREADS=1
+    export SGLANG_TIMEOUT_KEEP_ALIVE=75
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -2020,7 +2034,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --disaggregation-bootstrap-port 8998 \
         --disaggregation-ib-device shca_0,shca_1,shca_2,shca_3 \
         --enable-dp-attention-local-control-broadcast \
-    > 20260929_192911_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+        --enable-cache-report \
+        --tokenizer-backend fastokens \
+    > <LOG_FILE> 2>&1 &
 
     ```
 
@@ -2039,7 +2055,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20260929_192911_router.log 2>&1 &
+    > <LOG_FILE> 2>&1 &
 
     ```
 

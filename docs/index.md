@@ -17,5 +17,6 @@
 
 - [开始使用](getting-started/index.md)
 - [部署方案总览](deployment-guide/index.md)
+- [Benchmark Tools](benchmark-tools/index.md)
 - [软件栈](reference/software-stack.md)
 - [Recipe 模板](maintainer/recipe-template.md)

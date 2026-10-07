@@ -14,6 +14,10 @@ nav:
       - 总览: deployment-guide/index.md
       - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-CP8EP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(cp8ep8).md
       - DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-DP8EP8: deployment-guide/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(dp8ep8).md
+  - Benchmark Tools:
+      - 总览: benchmark-tools/index.md
+      - 多轮对话: benchmark-tools/multi-turn-dialogue.md
+      - 长文档 QA: benchmark-tools/long-document-qa.md
   - 参考:
       - 软件栈: reference/software-stack.md
       - 部署占位符约定: reference/deployment-placeholders.md
