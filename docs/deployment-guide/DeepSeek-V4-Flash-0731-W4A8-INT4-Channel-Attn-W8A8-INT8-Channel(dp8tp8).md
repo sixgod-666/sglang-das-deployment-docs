@@ -1,6 +1,6 @@
 # DeepSeek-V4-W4A8-DP8TP8
 
-本页归档 目标 P / D 节点 的 **PD 分离 + Mooncake DFS（L1 + L3 + L4）** 部署 Recipe。名称中的 DP8TP8 对应 Decode 的 `TP8 / DP8 / EP8` 并行；Prefill 为 `TP8 / DP1 / EP8` 并开启 CP（`interleave`）。
+本页按缓存层级维护 **PD 分离** 的 GPU-only（L1）、Mooncake CPU（L1 + L3）和 Mooncake DFS（L1 + L3 + L4）Recipe。名称中的 DP8TP8 表示 Prefill 与 Decode 均为 `TP8 / DP8 / EP8`；GPU-only 与 CPU 的 Prefill 均不启用 CP。
 
 ## 1. 受控软件栈
 
@@ -15,19 +15,255 @@
 
 !!! warning "版本记录边界"
 
-上表是站点级待补全的受控版本记录，并不等同于本次历史 Run 的完整环境指纹。复现前应在目标容器内重新采集 wheel、镜像和 Mooncake 的实际版本与哈希。
+    上表是站点级待补全的受控版本记录，并不等同于历史 Run 的完整环境指纹。复现前应在目标容器内重新采集 wheel、镜像和 Mooncake 的实际版本与哈希。
 
-### 1.1 环境搭建（待补充）
+以下部署内容均使用[部署占位符约定](../reference/deployment-placeholders.md)。不提交真实节点、RDMA 初始化地址、内部工作目录或历史日志文件名。
 
-部署前按[部署占位符约定](../reference/deployment-placeholders.md)替换网络与存储变量；以下命令仅为待填写位置，不代表已验证命令。
+## 2. PD 分离 GPU-only（L1）
 
-```bash
-# TODO: 填入经验证的镜像拉取或镜像构建命令。
-# TODO: 填入 SGLang DAS、Mooncake 与关联 wheel 的安装命令。
-# TODO: 填入版本、NIC、HCU/GPU、端口和共享存储的检查命令。
+### 2.1 已验证形态
+
+| 项目 | 值 |
+| --- | --- |
+| 缓存层级 | GPU L1；不启动 Mooncake master/client |
+| Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
+| Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
+| 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
+| 服务端口 | P/D `30001`；bootstrap `8998`；Router `10015` |
+
+### 2.2 自动化配置
+
+```ini
+[common]
+model_path = /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel
+model_loader_config = {"enable_multithread_load":"true","num_threads":64}
+sglang_port = 30001
+router_port = 10015
+bootstrap_port = 8998
+p_node_ip = <PREFILL_NODE_IP>
+d_node_ip = <DECODE_NODE_IP>
+ib_devices = shca_0,shca_1,shca_2,shca_3
+p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
+d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
+topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
+deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
+
+[pd_disagg]
+prefill_nodes = ${common:p_node_ip}
+decode_nodes = ${common:d_node_ip}
+
+[router]
+pd-disaggregation = true
+prefill_port = ${common:sglang_port}
+decode_port = ${common:sglang_port}
+bootstrap_port = ${common:bootstrap_port}
+host = 0.0.0.0
+port = ${common:router_port}
+policy = round_robin
+worker-startup-timeout-secs = 18000
+worker-startup-check-interval = 10
+health-check-endpoint = /v1/models
+request-timeout-secs = 18000
+
+[sglang_prefill]
+reasoning-parser = deepseek-v4
+enable-strict-thinking = true
+tool-call-parser = deepseekv4
+model-path = ${common:model_path}
+model-loader-extra-config = ${common:model_loader_config}
+quantization = slimquant_marlin
+tp-size = 8
+pp-size = 1
+dp = 8
+ep = 8
+enable-dp-attention = true
+enable-dp-lm-head = true
+enable-dp-attention-local-control-broadcast = true
+dist-init-addr = ${common:p_dist_init_addr}
+disaggregation-mode = prefill
+disaggregation-transfer-backend = mooncake
+disaggregation-bootstrap-port = ${common:bootstrap_port}
+disaggregation-ib-device = ${common:ib_devices}
+chunked-prefill-size = 32768
+max-prefill-tokens = 131072
+mem-fraction-static = 0.85
+max-running-requests = 48
+enable-cache-report = true
+tokenizer-backend = fastokens
+
+[sglang_decode]
+reasoning-parser = deepseek-v4
+tool-call-parser = deepseekv4
+model-path = ${common:model_path}
+model-loader-extra-config = ${common:model_loader_config}
+quantization = slimquant_marlin
+tp-size = 8
+pp-size = 1
+dp = 8
+ep = 8
+dist-init-addr = ${common:d_dist_init_addr}
+disaggregation-mode = decode
+disaggregation-bootstrap-port = ${common:bootstrap_port}
+disaggregation-ib-device = ${common:ib_devices}
+chunked-prefill-size = 32768
+max-total-tokens = 950000
+mem-fraction-static = 0.88
+max-running-requests = 160
+enable-dp-attention = true
+enable-dp-lm-head = true
+enable-dp-attention-local-control-broadcast = true
+enable-cache-report = true
+tokenizer-backend = fastokens
 ```
 
-## 2. PD 分离（DFS：L1 + L3 + L4）
+### 2.3 服务脚本
+
+启动顺序为 **Prefill → Decode → Router**。二者的公共运行环境包括 `NCCL_IB_HCA=shca_0,shca_1,shca_2,shca_3`、`NCCL_NET_PLUGIN=shca`、`NCCL_PLUGIN_P2P=ib`、`NCCL_SOCKET_IFNAME=ib0`、`GLOO_SOCKET_IFNAME=ib0` 和 `ROCSHMEM_TOPO_FILE_FORCE=/guofy/packages/DS-V4-W4A8/config/topo.config`。
+
+```bash
+# Prefill 的核心启动参数；环境变量按 2.2 的 global_prefill 等价项设置。
+sglang serve \
+  --reasoning-parser deepseek-v4 --enable-strict-thinking --tool-call-parser deepseekv4 \
+  --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
+  --model-loader-extra-config '{"enable_multithread_load":"true","num_threads":64}' \
+  --quantization slimquant_marlin --host 0.0.0.0 --port 30001 \
+  --tp-size 8 --pp-size 1 --dp 8 --ep 8 \
+  --enable-dp-attention --enable-dp-lm-head --enable-dp-attention-local-control-broadcast \
+  --dist-init-addr <PREFILL_DIST_INIT_ADDR> --nnodes 1 --node-rank 0 \
+  --disaggregation-mode prefill --disaggregation-transfer-backend mooncake \
+  --disaggregation-bootstrap-port 8998 \
+  --disaggregation-ib-device shca_0,shca_1,shca_2,shca_3 \
+  --max-prefill-tokens 131072 --max-running-requests 48 \
+  --enable-cache-report --tokenizer-backend fastokens
+
+# Decode 使用相同模型；DP8 的关键启动参数如下。
+sglang serve \
+  --reasoning-parser deepseek-v4 --tool-call-parser deepseekv4 \
+  --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
+  --tp-size 8 --pp-size 1 --dp 8 --ep 8 \
+  --dist-init-addr <DECODE_DIST_INIT_ADDR> --nnodes 1 --node-rank 0 \
+  --disaggregation-mode decode --skip-server-warmup \
+  --disaggregation-bootstrap-port 8998 \
+  --disaggregation-ib-device shca_0,shca_1,shca_2,shca_3 \
+  --enable-dp-attention --enable-dp-lm-head \
+  --enable-dp-attention-local-control-broadcast \
+  --enable-cache-report --tokenizer-backend fastokens
+
+python3 -m sglang_router.launch_router \
+  --prefill http://<PREFILL_NODE_IP>:30001 8998 \
+  --decode http://<DECODE_NODE_IP>:30001 \
+  --pd-disaggregation --host 0.0.0.0 --port 10015 \
+  --policy round_robin --worker-startup-timeout-secs 18000 \
+  --worker-startup-check-interval 10 --health-check-endpoint /v1/models \
+  --request-timeout-secs 18000 --log-level info
+```
+
+## 3. PD 分离 CPU（L1 + L3）
+
+### 3.1 已验证形态
+
+| 项目 | 值 |
+| --- | --- |
+| 缓存层级 | GPU L1 + Mooncake CPU L3；不启用 DFS / SSD Offload |
+| Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
+| Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
+| Mooncake client | P 节点，`global_segment_size=240GB` |
+| 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
+
+### 3.2 自动化配置
+
+CPU 配置继承第 2.2 节中的 P/D、Router 和公共网络参数，并增加 Mooncake 与 external linker：
+
+```ini
+[pd_disagg]
+prefill_nodes = ${common:p_node_ip}
+decode_nodes = ${common:d_node_ip}
+mooncake_clients = ${common:p_node_ip}
+
+[mooncake_master]
+logtostderr = true
+eviction_high_watermark_ratio = 0.8
+enable_http_metadata_server = true
+eviction_ratio = 0.1
+
+[mooncake_client]
+host = ${common:p_node_ip}
+global_segment_size = 240GB
+master_server_address = ${common:p_node_ip}:50051
+metadata_server = P2PHANDSHAKE
+protocol = rdma
+device_names = ${common:ib_devices}
+port = 50052
+logtostderr = true
+enable_http_server = true
+http_port = 9300
+
+[mooncake_client_global]
+MOONCAKE_LOCAL_HOSTNAME = ${common:p_node_ip}
+MC_STORE_CLIENT_METRIC = 1
+MC_STORE_ENABLE_SESSION_CACHE = 0
+MC_STORE_ENABLE_DFS_PREFETCH = 0
+
+[sglang_prefill]
+# 与 GPU-only 同为 TP8 / DP8 / EP8；额外启用外部缓存 linker。
+enable-unified-cache-external-linker = true
+unified-cache-external-linker-backend = mooncake
+```
+
+### 3.3 服务脚本
+
+启动顺序为 **Mooncake master → Mooncake client → Prefill → Decode → Router**。
+
+```bash
+mooncake_master \
+  --logtostderr --eviction_high_watermark_ratio=0.8 \
+  --enable_http_metadata_server --eviction_ratio=0.1
+
+export MOONCAKE_LOCAL_HOSTNAME=<PREFILL_NODE_IP>
+export MC_STORE_CLIENT_METRIC=1
+export MC_STORE_ENABLE_SESSION_CACHE=0
+export MC_STORE_ENABLE_DFS_PREFETCH=0
+mooncake_client \
+  --host=<PREFILL_NODE_IP> --global_segment_size=240GB \
+  --master_server_address=<PREFILL_NODE_IP>:50051 \
+  --metadata_server=P2PHANDSHAKE --protocol=rdma \
+  --device_names=shca_0,shca_1,shca_2,shca_3 --port=50052 \
+  --logtostderr --enable_http_server --http_port=9300
+```
+
+CPU Prefill 在第 2.3 节 GPU-only Prefill 的基础上增加以下环境变量和参数；Decode 与 Router 使用第 2.3 节的 DP8 脚本。
+
+```bash
+export MOONCAKE_MASTER=<PREFILL_NODE_IP>:50051
+export MOONCAKE_PROTOCOL=rdma
+export MOONCAKE_GLOBAL_SEGMENT_SIZE=0
+export MOONCAKE_LOCAL_HOSTNAME=<PREFILL_NODE_IP>
+export MC_TE_FILTERS=shca_0,shca_1,shca_2,shca_3
+export SGLANG_HOST_IP=<PREFILL_NODE_IP>
+export MC_MS_AUTO_DISC=1
+export MC_TRANSFER_TIMEOUT=30
+export SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
+export SGLANG_MOONCAKE_READ_PLAN=1
+export MC_STORE_MEMCPY=1
+export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
+export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
+
+# 在第 2.3 节 Prefill 命令中追加：
+# --enable-unified-cache-external-linker
+# --unified-cache-external-linker-backend mooncake
+```
+
+### 3.4 服务验证与运行边界
+
+`/v1/models` 只能作为基础存活检查，必须在开始压测前验证 Router 的真实 PD 请求。P/D 两端均需配置 `--enable-cache-report`，再结合请求侧 usage 与服务端日志解释命中率。
+
+```bash
+curl -sf http://<PREFILL_NODE_IP>:30001/v1/models
+curl -sf http://<DECODE_NODE_IP>:30001/v1/models
+curl -sf http://<PREFILL_NODE_IP>:10015/v1/models
+```
+
+## 4. PD 分离（DFS：L1 + L3 + L4）
 
 ### 2.1 已归档 Run
 

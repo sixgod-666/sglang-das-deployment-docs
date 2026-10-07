@@ -24,19 +24,23 @@
 ### 容器镜像
 
 ```bash
-# TODO: 填入经验证的镜像拉取或镜像构建命令。
+42.228.13.241:5000/jenkins/model_test_env/sglang:0.5.18-ubuntu22.04-dtk2604-py3.10-20260920-1508-xunfei
 ```
 
 ### SGLang DAS 与 Mooncake wheel
 
 ```bash
-# TODO: 填入 SGLang DAS、Mooncake 与关联 wheel 的安装命令。
+pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /guofy/packages/0924/sglang/1700/sglang-0.5.18.post2.dev111+g9957b5dab-py3-none-any.whl /guofy/packages/0924/mooncake/1100/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g01ed1d-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
 ```
 
 ### 运行前验证
 
 ```bash
-# TODO: 填入版本、NIC、HCU/GPU、端口和共享存储的检查命令。
+pip list |grep -e sglang -e moon
+mooncake-transfer-engine-shca            0.3.13.post1+das.opt1.dtk2604.g01ed1d
+sglang                                   0.5.18.post2.dev111+g9957b5dab
+sglang-kernel                            0.4.6.post1
+sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 ```
 
 === "PD 分离"
@@ -45,11 +49,10 @@
 
     ## 1. GPU-only（L1）
 
-    ### 1.1 已归档 Run
+    ### 1.1 部署方式
 
     | 项目 | 值 |
     | --- | --- |
-    | 证据 | 已验证 Run 快照（内部路径已脱敏） |
     | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP1 / EP8`，开启 CP（`interleave`） |
     | Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
     | 缓存层级 | GPU-only（L1）；该归档没有 Mooncake master/client 启动脚本 |
@@ -347,7 +350,7 @@
 
     **启动顺序：**     按顺序启动 Prefill、Decode 和 Router。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
 
-    ### 1.3 `sglang_serve_prefill_<PREFILL_NODE_IP>.sh`
+    ### 1.3 sglang_serve_prefill_<PREFILL_NODE_IP>.sh
 
     ```bash
     unset SGLANG_PD_HIDDEN_POOL_TOKENS
@@ -469,7 +472,7 @@
     > 20261005_145653_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
     ```
 
-    ### 1.4 `sglang_serve_decode_<DECODE_NODE_IP>.sh`
+    ### 1.4 sglang_serve_decode_<DECODE_NODE_IP>.sh
 
     ```bash
     unset SGLANG_PD_HIDDEN_POOL_TOKENS
@@ -583,7 +586,7 @@
     > 20261005_145653_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
     ```
 
-    ### 1.5 `router.sh`
+    ### 1.5 router.sh
 
     ```bash
     nohup python3 -m sglang_router.launch_router \
