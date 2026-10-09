@@ -604,9 +604,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     > 20261005_145653_router.log 2>&1 &
     ```
 
-    ### 1.6 运行边界与已知问题
+    ### 1.6 注意事项
 
-    当前页面展示的是脱敏后的部署示例；本页不记录性能结论，且尚未在本页面发现需要附加的运行问题记录。
+    当前 P / D 都加参数 --tokenizer-backend fastokens
+    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
+    以上参数的前提是 pip install fastokens
+    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
 
     ## 2. CPU（L1 + L3）
 
@@ -1275,9 +1278,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     > 20261005_141953_router.log 2>&1 &
     ```
 
-    ### 2.8 运行边界与已知问题
+    ### 2.8 注意事项
 
-    当前页面展示的是脱敏后的部署示例；本页不记录性能结论，且尚未在本页面发现需要附加的运行问题记录。
+    当前 P / D 都加参数 --tokenizer-backend fastokens
+    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
+    以上参数的前提是 pip install fastokens
+    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
 
     ## 3. DFS（L1 + L3 + L4）
 
@@ -2090,9 +2096,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     > 20261005_004919_router.log 2>&1 &
     ```
 
-    ### 3.8 运行边界与已知问题
+    ### 3.8 注意事项
 
-    当前页面展示的是脱敏后的部署示例；本页不记录性能结论，且尚未在本页面发现需要附加的运行问题记录。
+    当前 P / D 都加参数 --tokenizer-backend fastokens
+    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
+    以上参数的前提是 pip install fastokens
+    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
 
 === "IFB"
 
