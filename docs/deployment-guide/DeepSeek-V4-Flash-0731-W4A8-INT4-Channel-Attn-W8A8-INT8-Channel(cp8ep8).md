@@ -30,7 +30,7 @@
 ### SGLang DAS 与 Mooncake wheel
 
 ```bash
-pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /guofy/packages/0924/sglang/1700/sglang-0.5.18.post2.dev111+g9957b5dab-py3-none-any.whl /guofy/packages/0924/mooncake/1100/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g01ed1d-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
+pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /stortest/lzb_space/prefetch_reduction2428/attempt-20261003-082549/packages/sglang-0.5.18.post2.dev0+g924de4cf8-py3-none-any.whl /guofy/packages/0924/mooncake/1100/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g01ed1d-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
 ```
 
 ### 运行前验证
@@ -38,7 +38,7 @@ pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-a
 ```bash
 pip list |grep -e sglang -e moon
 mooncake-transfer-engine-shca            0.3.13.post1+das.opt1.dtk2604.g01ed1d
-sglang                                   0.5.18.post2.dev111+g9957b5dab
+sglang                                   0.5.18.post2.dev0+g924de4cf8
 sglang-kernel                            0.4.6.post1
 sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 ```
@@ -278,6 +278,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     GLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
 
     [global_decode]
     # 不继承的脏环境
@@ -346,6 +347,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     ```
 
     **启动顺序：**     按顺序启动 Prefill、Decode 和 Router。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
@@ -417,6 +419,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export GLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
@@ -538,6 +541,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -899,6 +903,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
 
     [global_decode]
     # 不继承的脏环境
@@ -967,6 +972,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
     TOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     ```
 
     **启动顺序：**     按 Mooncake master、Mooncake client、Prefill、Decode、Router 的顺序启动。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
@@ -1089,6 +1095,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
@@ -1212,6 +1219,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
     export TOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -1654,6 +1662,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
 
     [global_decode]
     # 不继承的脏环境
@@ -1722,6 +1731,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     ```
 
     **启动顺序：**     以下为经过脱敏后的部署示例。建议按下列顺序启动：
@@ -1901,6 +1911,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
@@ -2030,6 +2041,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
+    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
