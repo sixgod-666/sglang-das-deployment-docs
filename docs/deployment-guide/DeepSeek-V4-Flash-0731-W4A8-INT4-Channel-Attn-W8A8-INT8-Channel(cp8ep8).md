@@ -606,10 +606,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     ### 1.6 注意事项
 
-    当前 P / D 都加参数 --tokenizer-backend fastokens
-    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
-    以上参数的前提是 pip install fastokens
-    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
+    - P / D 都加参数：`--tokenizer-backend fastokens`
+    - P / D 都加环境变量：`FASTOKENS_BPE_THREADS=1`
+    - 前提：先安装 `pip install fastokens`
+    - 原理见：<https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa>
 
     ## 2. CPU（L1 + L3）
 
@@ -1280,10 +1280,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     ### 2.8 注意事项
 
-    当前 P / D 都加参数 --tokenizer-backend fastokens
-    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
-    以上参数的前提是 pip install fastokens
-    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
+    - P / D 都加参数：`--tokenizer-backend fastokens`
+    - P / D 都加环境变量：`FASTOKENS_BPE_THREADS=1`
+    - 前提：先安装 `pip install fastokens`
+    - 原理见：<https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa>
 
     ## 3. DFS（L1 + L3 + L4）
 
@@ -2098,10 +2098,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     ### 3.8 注意事项
 
-    当前 P / D 都加参数 --tokenizer-backend fastokens
-    P 和D 都加环境变量 FASTOKENS_BPE_THREADS=1
-    以上参数的前提是 pip install fastokens
-    原理见 https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa
+    - P / D 都加参数：`--tokenizer-backend fastokens`
+    - P / D 都加环境变量：`FASTOKENS_BPE_THREADS=1`
+    - 前提：先安装 `pip install fastokens`
+    - 原理见：<https://www.kdocs.cn/wiki/l/0lcgoTUsfaIS5q/qa>
 
 === "IFB"
 
