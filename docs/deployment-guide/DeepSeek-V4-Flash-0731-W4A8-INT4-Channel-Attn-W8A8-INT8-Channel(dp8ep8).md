@@ -2,7 +2,7 @@
 
 本页按部署形态维护 **PD 分离** 的可回溯 Recipe，已归档 GPU-only（L1）、CPU（L1 + L3）和 DFS（L1 + L3 + L4）三类脚本快照。GPU-only 与 CPU 的 Prefill、Decode 均采用 `TP8 / PP1 / DP8 / EP8`。
 
-## 受控软件栈
+## 当前软件栈
 
 | 组件 | 当前记录 |
 | --- | --- |

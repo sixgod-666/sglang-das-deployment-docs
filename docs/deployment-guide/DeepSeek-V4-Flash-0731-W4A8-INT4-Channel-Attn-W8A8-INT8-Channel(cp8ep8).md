@@ -1,8 +1,12 @@
 # DeepSeek-V4-W4A8-CP8EP8
 
 本页按部署形态分别维护 **PD 分离** 与 **IFB** 的可回溯 Recipe。PD 分离已归档 GPU-only（L1）、CPU（L1 + L3）和 DFS（L1 + L3 + L4）三类脚本快照；IFB 尚无已验证配置。
+!!! info "版本主要改动"
 
-## 受控软件栈
+    - 本次配置主要新加了mxhL1L3直通优化(free page table,多线程 lookup,BATCH_EXISTS新增但没开),以及lzb租约TTL修改(SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5);
+    - 当前性能: dfs 1000user最高性能值为78W ,CPU250user,最高性能值为89W.(mxhCPU性能可达97W)
+
+## 当前软件栈
 
 | 组件 | 当前记录 |
 | --- | --- |
@@ -13,11 +17,11 @@
 | 镜像 digest | `{{ stack.container_image.digest }}` |
 | 模型 revision | `{{ stack.model.revision }}` |
 
-!!! warning "版本记录边界"
+<!-- !!! warning "版本记录边界"
 
-    上表是站点级待补全的受控版本记录，并不等同于本次历史 run 的完整环境指纹。复现前应在目标容器内重新采集 wheel、镜像和 Mooncake 的实际版本与哈希。
+    上表是站点级待补全的受控版本记录，并不等同于本次历史 run 的完整环境指纹。复现前应在目标容器内重新采集 wheel、镜像和 Mooncake 的实际版本与哈希。 -->
 
-## 环境搭建（待补充）
+## 环境搭建
 
 部署前按[部署占位符约定](../reference/deployment-placeholders.md)替换网络与存储变量；以下命令仅为待填写位置，不代表已验证命令。
 
@@ -30,14 +34,15 @@
 ### SGLang DAS 与 Mooncake wheel
 
 ```bash
-pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /stortest/lzb_space/prefetch_reduction2428/attempt-20261003-082549/packages/sglang-0.5.18.post2.dev0+g924de4cf8-py3-none-any.whl /guofy/packages/0924/mooncake/1100/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g01ed1d-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
+pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /stortest/lzb_space/prefetch_reduction2428/attempt-20261003-082549/packages/sglang-0.5.18.post2.dev0+g924de4cf8-py3-none-any.whl --no-deps  (待更新)
+pip install -U /guofy/packages/1010/mooncake/1400/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g808124-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
 ```
 
 ### 运行前验证
 
 ```bash
 pip list |grep -e sglang -e moon
-mooncake-transfer-engine-shca            0.3.13.post1+das.opt1.dtk2604.g01ed1d
+mooncake-transfer-engine-shca            0.3.13.post1+das.opt1.dtk2604.g808124
 sglang                                   0.5.18.post2.dev0+g924de4cf8
 sglang-kernel                            0.4.6.post1
 sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
@@ -85,7 +90,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
-
+    topology_best_json = /guofy/packages/DS-V4-W4A8/config/topology-best.json
     [pd_disagg]
     prefill_nodes = ${common:p_node_ip}
     decode_nodes = ${common:d_node_ip}
@@ -628,13 +633,17 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     | Mooncake client | `global_segment_size=200GB` |
     | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
 
+    !!! note "参数来源"
+
+        本节 Prefill 侧脚本参数参考自 mxh 的 L1L3P 脚本 [`serve_dpsk_v4_flash_prefill_cp8ep8_dspark.sh`](../assets/serve_dpsk_v4_flash_prefill_cp8ep8_dspark.sh)（可下载）。
+
     ### 2.2 自动化配置
 
     ```ini
-    # PD 分离部署配置（内部工作路径已脱敏）
-    # 拓扑: P=<PREFILL_NODE_IP>（CP8EP8，8 卡）；D=<DECODE_NODE_IP>（TP8DP8，8 卡）；Router 位于 P 节点的 10015 端口
+    # PD分离 + mooncake DFS 部署 
+    # 拓扑: P=<PREFILL_NODE_IP>(CP8EP8, 8卡)  D=<DECODE_NODE_IP>(TP8DP8, 8卡)  router=P节点:10015
     # 变量引用语法: ${common:xxx} 由框架在解析时展开;值内 bash 语法($VAR/$((..)))原样透传
-    # overlap - ;read plan + ;split+
+ 
 
     [common]
     # --- 模型与端口 ---
@@ -648,23 +657,27 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # 各角色节点IP,换节点只改对应一行;dist_init_addr的ib地址与以太地址无固定规则,需手动对应改
     p_node_ip = <PREFILL_NODE_IP>
     d_node_ip = <DECODE_NODE_IP>
+    # mooncake client所在节点(当前与P同节点;client不必须在P上,故独立变量)
     mc_node_ip = <PREFILL_NODE_IP>
     ib_devices = shca_0,shca_1,shca_2,shca_3
-    p_dist_init_addr =  <PREFILL_DIST_INIT_ADDR>
-    d_dist_init_addr =  <DECODE_DIST_INIT_ADDR>
+    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
+    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
-
+    init_expert_location = /guofy/packages/DS-V4-W4A8/need/placement_candidate.json
     [pd_disagg]
     prefill_nodes = ${common:p_node_ip}
     decode_nodes = ${common:d_node_ip}
     mooncake_clients = ${common:mc_node_ip}
+
 
     [mooncake_master]
     logtostderr = true
     eviction_high_watermark_ratio = 0.8
     enable_http_metadata_server = true
     eviction_ratio = 0.1
+
+
 
     [mooncake_client]
     host = ${common:mc_node_ip}
@@ -678,11 +691,14 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     enable_http_server = true
     http_port = 9300
 
+
     [mooncake_client_global]
     MOONCAKE_LOCAL_HOSTNAME = ${common:mc_node_ip}
     MC_STORE_CLIENT_METRIC = 1
     MC_STORE_ENABLE_SESSION_CACHE = 0
     MC_STORE_ENABLE_DFS_PREFETCH = 0
+
+
 
     [router]
     pd-disaggregation = true
@@ -698,6 +714,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     health-check-endpoint = /v1/models
     request-timeout-secs = 18000
     log-level = info
+
 
     [sglang_prefill]
     # --- Prefill: CP8EP8 PP1 + DSPARK (03_p_24.sh) ---
@@ -716,6 +733,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     moe-dense-tp-size = 1
     moe-a2a-backend = megamoe
     moe-runner-backend = auto
+    init-expert-location = ${common:init_expert_location}
     deepep-mode = normal
     deepep-config = ${common:deepep_config}
     dist-init-addr = ${common:p_dist_init_addr}
@@ -738,7 +756,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 96
+    max-running-requests = 128
     reasoning-parser = deepseek-v4
     tool-call-parser = deepseekv4
     kv-cache-dtype = auto
@@ -755,7 +773,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     enable-cp-cache-layer-split = true
     cuda-graph-backend-prefill = disabled
     disable-overlap-schedule = true
-    init-expert-location =/guofy/packages/DS-V4-W4A8/need/placement_candidate.json
     tokenizer-backend = fastokens
     enable-cache-report = true
 
@@ -817,12 +834,12 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK=4096
     SGLANG_MOE_COPY_WEIGHT_VIEWS_BEFORE_H2D=1
     PYTHONDONTWRITEBYTECODE=1
-
     # --- sglang runtime ---
     SGLANG_SET_CPU_AFFINITY = 1
     SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT = 1200
     SGLANG_USE_LIGHTOP = 1
     SGLANG_ROCM_USE_AITER_MOE = 1
+    SGLANG_ROCM_USE_AITER_TILELANG_MHC = 1
     SGLANG_GROUPGEMM = True
     SGLANG_USE_FP8_W8A8_MOE = 0
     SGLANG_USE_LIGHTOP_EP_MOE_ALIGN = 1
@@ -881,29 +898,78 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_LOCAL_HOSTNAME = ${common:p_node_ip}
     MC_TE_FILTERS = ${common:ib_devices}
     SGLANG_HOST_IP = ${common:p_node_ip}
-    SGLANG_KV_LAYOUT_HCU_FA = 0
+    # SGLANG_KV_LAYOUT_HCU_FA = 0
     MC_MS_AUTO_DISC = 1
     MC_IB_PCI_RELAXED_ORDERING = 0
     MC_TRANSFER_TIMEOUT = 30
     MC_SLICE_SIZE = 1048576
+
 
     MC_STORE_ENABLE_SESSION_CACHE = 0
     MC_STORE_ENABLE_DFS_PREFETCH = 0
     MC_STORE_DFS_READ_TRACE = 1
     SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
 
-    SGLANG_MOONCAKE_READ_PLAN=1
 
-    SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
+
+
     SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     MC_STORE_CLIENT_METRIC=0
 
     MC_STORE_MEMCPY=1
-    MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=6442450944
+    MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
+
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
     FASTOKENS_BPE_THREADS=1
-    SGLANG_TIMEOUT_KEEP_ALIVE=75
+    SGLANG_TIMEOUT_KEEP_ALIVE=75 
     SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    #mxh优化
+    SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
+    SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
+    SGLANG_DSV4_CHAT_ENCODING_TIMING=0
+    # MOONCAKE_TE_META_DATA_SERVER=P2PHANDSHAKE
+
+    MOONCAKE_TENANT_ID=default
+    MOONCAKE_CHECK_SERVER=1
+    MC_CUSTOM_TOPO_JSON=${common:topology_best_json} 
+
+    MC_ALLOWED_IBV_DEVICES=shca_0,shca_1,shca_2,shca_3
+    MC_MS_FILTERS=shca_0,shca_1,shca_2,shca_3
+    MC_IB_GID_INDEX=0
+
+
+    # Direct L3 transfers the model's native page pools directly between L1 and
+    # Mooncake. Keep the same HCU KV layout as the L1 baseline for a fair comparison.
+    # 之前设的0
+    SGLANG_KV_LAYOUT_HCU_FA=1
+    # ReadPlan and read-path controls (0=off, 1=on). Requires the rebuilt package.
+    SGLANG_MOONCAKE_READ_PLAN= 1
+    # Experimental compact reads; set READ_PLAN=0 when enabling READ_LAYOUT.
+    SGLANG_MOONCAKE_READ_LAYOUT= 0
+    # Read-path controls for this CP8 configuration.
+    # Override individual variables before launch for comparisons.
+    MOONCAKE_READ_PLAN_PIPELINE= 0
+    # 不开BATCH_EXISTS
+    SGLANG_MOONCAKE_BATCH_EXISTS= 0
+    SGLANG_MOONCAKE_LINEAR_SCAN= 0
+    SGLANG_MOONCAKE_LAZY_PUT_METADATA= 0
+    SGLANG_MOONCAKE_ASYNC_LOOKUP= 1
+    # Per-rank request lookup concurrency; only used when async lookup is enabled.
+    SGLANG_MOONCAKE_ASYNC_LOOKUP_WORKERS= 8
+    # Experimental: submit waiting-request lookups before the current P forward.
+    # Requires ASYNC_LOOKUP=1; does not prefetch sessions or KV data.
+    SGLANG_MOONCAKE_LOOKUP_PREFETCH= 0
+    SGLANG_MOONCAKE_LOOKUP_PREFETCH_TIMING= 0
+    SGLANG_KV_FREE_PAGE_TABLE= 1
+    MOONCAKE_RDMA_MR_INDEX= 0
+    MOONCAKE_RDMA_EARLY_SUBMIT= 0
+    MOONCAKE_SEGMENT_LOCATION_CACHE=0
+    # Per-thread cache capacity: 0 disables caching; valid range 0-256.
+    MOONCAKE_SEGMENT_LOCATION_CACHE_CAPACITY=0
+    # TCP_NODELAY is a library fix, with no additional runtime toggle.
+
+
+
 
     [global_decode]
     # 不继承的脏环境
@@ -971,8 +1037,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_ENABLE_UNIFIED_RADIX_TREE = 1
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
     TOKENS_BPE_THREADS=1
-    SGLANG_TIMEOUT_KEEP_ALIVE=75
-    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    SGLANG_TIMEOUT_KEEP_ALIVE=75 
     ```
 
     **启动顺序：**     按 Mooncake master、Mooncake client、Prefill、Decode、Router 的顺序启动。以下为经过脱敏后的部署示例；请在目标环境按占位符替换网络和存储变量。
@@ -985,7 +1050,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --eviction_high_watermark_ratio=0.8 \
         --enable_http_metadata_server \
         --eviction_ratio=0.1 \
-    > 20261005_141953_mooncake_master.log 2>&1 &
+    > 20261011_202806_mooncake_master.log 2>&1 &
+
     ```
 
     ### 2.4 mooncake_client_<PREFILL_NODE_IP>.sh
@@ -1006,7 +1072,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --logtostderr \
         --enable_http_server \
         --http_port=9300 \
-    > 20261005_141953_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20261011_202806_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 2.5 sglang_serve_prefill_<PREFILL_NODE_IP>.sh
@@ -1025,6 +1092,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT=1200
     export SGLANG_USE_LIGHTOP=1
     export SGLANG_ROCM_USE_AITER_MOE=1
+    export SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
     export SGLANG_GROUPGEMM=True
     export SGLANG_USE_FP8_W8A8_MOE=0
     export SGLANG_USE_LIGHTOP_EP_MOE_ALIGN=1
@@ -1077,7 +1145,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MOONCAKE_LOCAL_HOSTNAME=<PREFILL_NODE_IP>
     export MC_TE_FILTERS=shca_0,shca_1,shca_2,shca_3
     export SGLANG_HOST_IP=<PREFILL_NODE_IP>
-    export SGLANG_KV_LAYOUT_HCU_FA=0
     export MC_MS_AUTO_DISC=1
     export MC_IB_PCI_RELAXED_ORDERING=0
     export MC_TRANSFER_TIMEOUT=30
@@ -1086,16 +1153,40 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_ENABLE_DFS_PREFETCH=0
     export MC_STORE_DFS_READ_TRACE=1
     export SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
-    export SGLANG_MOONCAKE_READ_PLAN=1
-    export SGLANG_ROCM_USE_AITER_TILELANG_MHC=1
     export SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     export MC_STORE_CLIENT_METRIC=0
     export MC_STORE_MEMCPY=1
-    export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=6442450944
+    export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     export SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS=400
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    export SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
+    export SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
+    export SGLANG_DSV4_CHAT_ENCODING_TIMING=0
+    export MOONCAKE_TENANT_ID=default
+    export MOONCAKE_CHECK_SERVER=1
+    export MC_CUSTOM_TOPO_JSON=/guofy/packages/DS-V4-W4A8/config/topology-best.json
+    export MC_ALLOWED_IBV_DEVICES=shca_0,shca_1,shca_2,shca_3
+    export MC_MS_FILTERS=shca_0,shca_1,shca_2,shca_3
+    export MC_IB_GID_INDEX=0
+    export SGLANG_KV_LAYOUT_HCU_FA=1
+    export SGLANG_MOONCAKE_READ_PLAN=1
+    export SGLANG_MOONCAKE_READ_LAYOUT=0
+    export MOONCAKE_READ_PLAN_PIPELINE=0
+    export SGLANG_MOONCAKE_BATCH_EXISTS=0
+    export SGLANG_MOONCAKE_LINEAR_SCAN=0
+    export SGLANG_MOONCAKE_LAZY_PUT_METADATA=0
+    export SGLANG_MOONCAKE_ASYNC_LOOKUP=1
+    export SGLANG_MOONCAKE_ASYNC_LOOKUP_WORKERS=8
+    export SGLANG_MOONCAKE_LOOKUP_PREFETCH=0
+    export SGLANG_MOONCAKE_LOOKUP_PREFETCH_TIMING=0
+    export SGLANG_KV_FREE_PAGE_TABLE=1
+    export MOONCAKE_RDMA_MR_INDEX=0
+    export MOONCAKE_RDMA_EARLY_SUBMIT=0
+    export MOONCAKE_SEGMENT_LOCATION_CACHE=0
+    export MOONCAKE_SEGMENT_LOCATION_CACHE_CAPACITY=0
+    
     nohup sglang serve \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
@@ -1112,6 +1203,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --moe-dense-tp-size 1 \
         --moe-a2a-backend megamoe \
         --moe-runner-backend auto \
+        --init-expert-location /guofy/packages/DS-V4-W4A8/need/placement_candidate.json \
         --deepep-mode normal \
         --deepep-config /guofy/packages/DS-V4-W4A8/config/deepep_config.json \
         --dist-init-addr <PREFILL_DIST_INIT_ADDR> \
@@ -1134,7 +1226,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 96 \
+        --max-running-requests 128 \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
         --kv-cache-dtype auto \
@@ -1147,10 +1239,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable-cp-cache-layer-split \
         --cuda-graph-backend-prefill disabled \
         --disable-overlap-schedule \
-        --init-expert-location /guofy/packages/DS-V4-W4A8/need/placement_candidate.json \
         --tokenizer-backend fastokens \
         --enable-cache-report \
-    > 20261005_141953_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20261011_202806_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 2.6 sglang_serve_decode_<DECODE_NODE_IP>.sh
@@ -1219,7 +1311,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
     export TOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
-    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -1265,7 +1356,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable-dp-attention-local-control-broadcast \
         --tokenizer-backend fastokens \
         --enable-cache-report \
-    > 20261005_141953_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+    > 20261011_202806_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 2.7 router.sh
@@ -1283,7 +1375,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20261005_141953_router.log 2>&1 &
+    > 20261011_202806_router.log 2>&1 &
+
     ```
 
     ### 2.8 注意事项
@@ -1302,12 +1395,13 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     | 项目 | 值 |
     | --- | --- |
     | 证据 | 已验证 Run 快照（内部路径已脱敏） |
+    | Run 目录 | `<WORKSPACE_ROOT>/log/20261011_211903_204-pd-multi-turn-qa_100`（case `204-pd-multi-turn-qa_100.py`） |
     | 部署形态 | Prefill / Decode 分离，Mooncake RDMA + DFS |
     | Prefill（P） | `<PREFILL_NODE_IP>`，`TP8 / PP1 / DP1 / EP8`，开启 CP（`interleave`） |
     | Decode（D） | `<DECODE_NODE_IP>`，`TP8 / PP1 / DP8 / EP8` |
     | 模型 | `DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel` |
-    | 框架 case | `cases/2-sglang-perf/204-pd-multi-turn-qa_1000.py` |
-    | 配置来源 | `sglang_conf/DeepSeek-V4-W4A8-CP8EP8-PD/03_mooncake_pd_dfs_parastor_1516_hy_80G_4G_10T_48bf.conf` |
+    | 框架 case | `cases/2-sglang-perf/204-pd-multi-turn-qa_100.py` |
+    | 配置来源 | `sglang_conf/DeepSeek-V4-W4A8-CP8EP8-PD/03_PD_DFS_2910_mao_8G_4G_20T_128bf.conf` |
     | Router | P 节点，监听 `10015` |
     | SGLang | P/D 均监听 `30001`；bootstrap 端口 `8998` |
 
@@ -1331,14 +1425,15 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # 各角色节点IP,换节点只改对应一行;dist_init_addr的ib地址与以太地址无固定规则,需手动对应改
     p_node_ip = <PREFILL_NODE_IP>
     d_node_ip = <DECODE_NODE_IP>
+    # mooncake client所在节点(当前与P同节点;client不必须在P上,故独立变量)
     mc_node_ip = <PREFILL_NODE_IP>
     ib_devices = shca_0,shca_1,shca_2,shca_3
-    p_dist_init_addr =  <PREFILL_DIST_INIT_ADDR>
-    d_dist_init_addr =  <DECODE_DIST_INIT_ADDR>
+    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
+    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
+    dfs_root =  <DFS_ROOT>
 
-    dfs_root = <DFS_ROOT>
 
     dfs_bucket_capacity = 4294967296
     dfs_max_bucket_count = 5120
@@ -1464,7 +1559,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     max-prefill-tokens = 131072
     mem-fraction-static = 0.85
     swa-full-tokens-ratio = 0.15
-    max-running-requests = 96
+    max-running-requests = 128
     reasoning-parser = deepseek-v4
     tool-call-parser = deepseekv4
     kv-cache-dtype = auto
@@ -1540,7 +1635,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     [global_prefill]
     # 不继承的脏环境(原脚本的 unset)
-    unset_envs = SGLANG_PD_HIDDEN_POOL_TOKENS,SGLANG_PD_HIDDEN_RECV_POOL_TOKENS,PYTHONPYCACHEPREFIX,SGLANG_DEEPEP_BF16_DISPATCH
+    unset_envs = SGLANG_PD_HIDDEN_POOL_TOKENS,SGLANG_PD_HIDDEN_RECV_POOL_TOKENS,PYTHONPYCACHEPREFIX,SGLANG_DEEPEP_BF16_DISPATCH,MC_TOPO_FILE_FORCE
 
     # --- pytorch / allocator ---
     PYTORCH_ALLOC_CONF = expandable_segments:True
@@ -1613,7 +1708,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_LOCAL_HOSTNAME = ${common:p_node_ip}
     MC_TE_FILTERS = ${common:ib_devices}
     SGLANG_HOST_IP = ${common:p_node_ip}
-    SGLANG_KV_LAYOUT_HCU_FA = 0
+    # SGLANG_KV_LAYOUT_HCU_FA = 0
     MC_MS_AUTO_DISC = 1
     MC_IB_PCI_RELAXED_ORDERING = 0
     MC_TRANSFER_TIMEOUT = 30
@@ -1640,11 +1735,10 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_DFS_FORCE_ONE_REPLICA = True
 
     MC_STORE_DFS_H2D_KERNEL=1
-    # MC_STORE_DFS_PINNED_POOL_BYTES=6442450944
     MC_STORE_DFS_PINNED_POOL_BYTES=8589934592
     MOONCAKE_DFS_BATCH_READ_MERGE_ENABLED=1
 
-    SGLANG_MOONCAKE_READ_PLAN=1
+
 
     SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
 
@@ -1656,13 +1750,58 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
 
     MC_STORE_DFS_PREFETCH_ARENA_SIZE_BYTES=6442450944
-    # 恒远调试
-    #SGLANG_MOONCAKE_PREFETCH_DEBUG=1
-    #SGLANG_DAS_PREFETCH_TRACE=1
+
     SGLANG_MOONCAKE_FINAL_POLL_TIMEOUT_MS = 400
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
     SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    #mxh优化
+    SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
+    SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
+    SGLANG_DSV4_CHAT_ENCODING_TIMING=0
+    # MOONCAKE_TE_META_DATA_SERVER=P2PHANDSHAKE
+
+    MOONCAKE_TENANT_ID=default
+    MOONCAKE_CHECK_SERVER=1
+    MC_CUSTOM_TOPO_JSON=/guofy/packages/DS-V4-W4A8/config/topology-best.json
+
+    MC_ALLOWED_IBV_DEVICES=shca_0,shca_1,shca_2,shca_3
+    MC_MS_FILTERS=shca_0,shca_1,shca_2,shca_3
+    MC_IB_GID_INDEX=0
+
+
+    # Direct L3 transfers the model's native page pools directly between L1 and
+    # Mooncake. Keep the same HCU KV layout as the L1 baseline for a fair comparison.
+    # 之前设的0
+    SGLANG_KV_LAYOUT_HCU_FA=1
+    # ReadPlan and read-path controls (0=off, 1=on). Requires the rebuilt package.
+    SGLANG_MOONCAKE_READ_PLAN= 1
+    # Experimental compact reads; set READ_PLAN=0 when enabling READ_LAYOUT.
+    SGLANG_MOONCAKE_READ_LAYOUT= 0
+    # Read-path controls for this CP8 configuration.
+    # Override individual variables before launch for comparisons.
+    MOONCAKE_READ_PLAN_PIPELINE= 0
+    # 不开BATCH_EXISTS
+    SGLANG_MOONCAKE_BATCH_EXISTS= 0
+    SGLANG_MOONCAKE_LINEAR_SCAN= 0
+    SGLANG_MOONCAKE_LAZY_PUT_METADATA= 0
+    SGLANG_MOONCAKE_ASYNC_LOOKUP= 1
+    # Per-rank request lookup concurrency; only used when async lookup is enabled.
+    SGLANG_MOONCAKE_ASYNC_LOOKUP_WORKERS= 8
+    # Experimental: submit waiting-request lookups before the current P forward.
+    # Requires ASYNC_LOOKUP=1; does not prefetch sessions or KV data.
+    SGLANG_MOONCAKE_LOOKUP_PREFETCH= 0
+    SGLANG_MOONCAKE_LOOKUP_PREFETCH_TIMING= 0
+    SGLANG_KV_FREE_PAGE_TABLE= 1
+    MOONCAKE_RDMA_MR_INDEX= 0
+    MOONCAKE_RDMA_EARLY_SUBMIT= 0
+    MOONCAKE_SEGMENT_LOCATION_CACHE=0
+    # Per-thread cache capacity: 0 disables caching; valid range 0-256.
+    MOONCAKE_SEGMENT_LOCATION_CACHE_CAPACITY=0
+    # TCP_NODELAY is a library fix, with no additional runtime toggle.
+
+
+
 
     [global_decode]
     # 不继承的脏环境
@@ -1731,7 +1870,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE = 1
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
-    SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     ```
 
     **启动顺序：**     以下为经过脱敏后的部署示例。建议按下列顺序启动：
@@ -1741,7 +1879,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     3. 在 P 节点启动 Prefill SGLang 服务。
     4. 在 D 节点启动 Decode SGLang 服务。
     5. 在 P 节点启动 PD Router。
-    6. 服务就绪后，通过框架执行 `204-pd-multi-turn-qa_1000.py`。
+    6. 服务就绪后，通过框架执行 `204-pd-multi-turn-qa_100.py`。
     ### 3.3 Mooncake master（P）
 
     ```bash
@@ -1767,7 +1905,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_metadata_server \
         --eviction_ratio=0.1 \
         --enable_offload=true \
-    > 20261005_004919_mooncake_master.log 2>&1 &
+    > 20261011_211903_mooncake_master.log 2>&1 &
+
     ```
 
     ### 3.4 Mooncake client（P）
@@ -1803,7 +1942,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable_http_server \
         --http_port=9300 \
         --enable_offload=true \
-    > 20261005_004919_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20261011_211903_mooncake_client_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.5 Prefill SGLang（P）
@@ -1813,6 +1953,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     unset SGLANG_PD_HIDDEN_RECV_POOL_TOKENS
     unset PYTHONPYCACHEPREFIX
     unset SGLANG_DEEPEP_BF16_DISPATCH
+    unset MC_TOPO_FILE_FORCE
     export PYTORCH_ALLOC_CONF=expandable_segments:True
     export SGLANG_HCU_MEGA_MOE_RUNTIME=megamoe
     export SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK=4096
@@ -1875,7 +2016,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MOONCAKE_LOCAL_HOSTNAME=<PREFILL_NODE_IP>
     export MC_TE_FILTERS=shca_0,shca_1,shca_2,shca_3
     export SGLANG_HOST_IP=<PREFILL_NODE_IP>
-    export SGLANG_KV_LAYOUT_HCU_FA=0
     export MC_MS_AUTO_DISC=1
     export MC_IB_PCI_RELAXED_ORDERING=0
     export MC_TRANSFER_TIMEOUT=30
@@ -1902,7 +2042,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_STORE_DFS_H2D_KERNEL=1
     export MC_STORE_DFS_PINNED_POOL_BYTES=8589934592
     export MOONCAKE_DFS_BATCH_READ_MERGE_ENABLED=1
-    export SGLANG_MOONCAKE_READ_PLAN=1
     export SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
     export MC_STORE_CLIENT_METRIC=0
     export MC_STORE_MEMCPY=1
@@ -1912,6 +2051,31 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    export SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
+    export SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
+    export SGLANG_DSV4_CHAT_ENCODING_TIMING=0
+    export MOONCAKE_TENANT_ID=default
+    export MOONCAKE_CHECK_SERVER=1
+    export MC_CUSTOM_TOPO_JSON=/guofy/packages/DS-V4-W4A8/config/topology-best.json
+    export MC_ALLOWED_IBV_DEVICES=shca_0,shca_1,shca_2,shca_3
+    export MC_MS_FILTERS=shca_0,shca_1,shca_2,shca_3
+    export MC_IB_GID_INDEX=0
+    export SGLANG_KV_LAYOUT_HCU_FA=1
+    export SGLANG_MOONCAKE_READ_PLAN=1
+    export SGLANG_MOONCAKE_READ_LAYOUT=0
+    export MOONCAKE_READ_PLAN_PIPELINE=0
+    export SGLANG_MOONCAKE_BATCH_EXISTS=0
+    export SGLANG_MOONCAKE_LINEAR_SCAN=0
+    export SGLANG_MOONCAKE_LAZY_PUT_METADATA=0
+    export SGLANG_MOONCAKE_ASYNC_LOOKUP=1
+    export SGLANG_MOONCAKE_ASYNC_LOOKUP_WORKERS=8
+    export SGLANG_MOONCAKE_LOOKUP_PREFETCH=0
+    export SGLANG_MOONCAKE_LOOKUP_PREFETCH_TIMING=0
+    export SGLANG_KV_FREE_PAGE_TABLE=1
+    export MOONCAKE_RDMA_MR_INDEX=0
+    export MOONCAKE_RDMA_EARLY_SUBMIT=0
+    export MOONCAKE_SEGMENT_LOCATION_CACHE=0
+    export MOONCAKE_SEGMENT_LOCATION_CACHE_CAPACITY=0
     nohup sglang serve \
         --model-path /ai_data/models/DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel \
         --model-loader-extra-config "{\"enable_multithread_load\": \"true\",\"num_threads\": 64}" \
@@ -1951,7 +2115,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --max-prefill-tokens 131072 \
         --mem-fraction-static 0.85 \
         --swa-full-tokens-ratio 0.15 \
-        --max-running-requests 96 \
+        --max-running-requests 128 \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
         --kv-cache-dtype auto \
@@ -1972,7 +2136,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --mooncake-waiting-queue-dfs-prefetch-max-bytes 4294967296 \
         --enable-cache-report \
         --tokenizer-backend fastokens \
-    > 20261005_004919_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+    > 20261011_211903_sglang_running_prefill_<PREFILL_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.6 Decode SGLang（D）
@@ -2041,7 +2206,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_EXPERIMENTAL_DSV4_DECODE_RADIX_CACHE=1
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
-    export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     nohup sglang serve \
         --reasoning-parser deepseek-v4 \
         --tool-call-parser deepseekv4 \
@@ -2087,7 +2251,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
         --enable-dp-attention-local-control-broadcast \
         --tokenizer-backend fastokens \
         --enable-cache-report \
-    > 20261005_004919_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+    > 20261011_211903_sglang_running_decode_<DECODE_NODE_IP>.log 2>&1 &
+
     ```
 
     ### 3.7 PD Router（P）
@@ -2105,7 +2270,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     --health-check-endpoint=/v1/models \
     --request-timeout-secs=18000 \
     --log-level=info \
-    > 20261005_004919_router.log 2>&1 &
+    > 20261011_211903_router.log 2>&1 &
+
     ```
 
     ### 3.8 注意事项
