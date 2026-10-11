@@ -90,7 +90,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
-    topology_best_json = /guofy/packages/DS-V4-W4A8/config/topology-best.json
+    
     [pd_disagg]
     prefill_nodes = ${common:p_node_ip}
     decode_nodes = ${common:d_node_ip}
@@ -665,6 +665,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
     init_expert_location = /guofy/packages/DS-V4-W4A8/need/placement_candidate.json
+    topology_best_json = /guofy/packages/DS-V4-W4A8/config/topology-best.json
+
     [pd_disagg]
     prefill_nodes = ${common:p_node_ip}
     decode_nodes = ${common:d_node_ip}
@@ -1432,6 +1434,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
+    init_expert_location = /guofy/packages/DS-V4-W4A8/need/placement_candidate.json
+    topology_best_json = /guofy/packages/DS-V4-W4A8/config/topology-best.json
     dfs_root =  <DFS_ROOT>
 
 
@@ -1535,7 +1539,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     moe-dense-tp-size = 1
     moe-a2a-backend = megamoe
     moe-runner-backend = auto
-    init-expert-location =/guofy/packages/DS-V4-W4A8/need/placement_candidate.json
+    init-expert-location =${common:init_expert_location}
     deepep-mode = normal
     deepep-config = ${common:deepep_config}
     dist-init-addr = ${common:p_dist_init_addr}
@@ -1763,7 +1767,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     MOONCAKE_TENANT_ID=default
     MOONCAKE_CHECK_SERVER=1
-    MC_CUSTOM_TOPO_JSON=/guofy/packages/DS-V4-W4A8/config/topology-best.json
+    MC_CUSTOM_TOPO_JSON=${common:topology_best_json}
 
     MC_ALLOWED_IBV_DEVICES=shca_0,shca_1,shca_2,shca_3
     MC_MS_FILTERS=shca_0,shca_1,shca_2,shca_3
