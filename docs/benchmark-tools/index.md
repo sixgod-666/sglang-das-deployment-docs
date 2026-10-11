@@ -1,10 +1,11 @@
 # Benchmark Tools
 
-本节提供两个经过公开审查的 **HTTP 基准客户端**。它们向已经启动的推理服务发送请求，不负责拉起模型、SGLang、Router 或缓存服务。
+本节提供三个经过公开审查的 **HTTP 基准客户端**。它们向已经启动的推理服务发送请求，不负责拉起模型、SGLang、Router 或缓存服务。
 
 | 目标场景 | 工具 | 适用情况 |
 | --- | --- | --- |
 | 多用户多轮对话、会话历史前缀复用、轮间同步 | [多轮对话](multi-turn-dialogue.md) | SGLang 原生 `/generate` 或 OpenAI 兼容 `/v1/chat/completions` |
+| 多轮对话 + L1/L3 外部缓存实验：DP 亲和、轮间缓存控制、精确长度 | [多轮对话（mxh 版）](multi-turn-dialogue-mxh.md) | 多轮对话工具的扩展变体，接口兼容；`/generate` 或 OpenAI 兼容接口 |
 | 长文档 warmup/query、全量或部分前缀命中 | [长文档 QA](long-document-qa.md) | OpenAI 兼容服务；可用于 SGLang 或其他兼容服务 |
 
 ## 使用前提

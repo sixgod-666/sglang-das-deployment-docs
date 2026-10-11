@@ -17,6 +17,7 @@ nav:
   - Benchmark Tools:
       - 总览: benchmark-tools/index.md
       - 多轮对话: benchmark-tools/multi-turn-dialogue.md
+      - 多轮对话（mxh 版）: benchmark-tools/multi-turn-dialogue-mxh.md
       - 长文档 QA: benchmark-tools/long-document-qa.md
   - 参考:
       - 软件栈: reference/software-stack.md
