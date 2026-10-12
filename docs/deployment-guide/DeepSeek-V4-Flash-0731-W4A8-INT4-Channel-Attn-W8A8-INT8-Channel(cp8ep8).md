@@ -4,7 +4,9 @@
 !!! info "版本主要改动"
 
     - 本次配置主要新加了mxhL1L3直通优化(free page table,多线程 lookup,BATCH_EXISTS新增但没开),以及lzb租约TTL修改(SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5);
-    - 当前性能: dfs 1000user最高性能值为78W ,CPU250user,最高性能值为89W.(mxhCPU性能可达97W)
+    - 当前性能: dfs 1000user最高性能值为78W ,CPU250user,最高性能值为89W.(mxhCPU性能可达97W) ;
+    - P节点新增环境变量 export MC_WORKERS_PER_CTX=1
+    - !!!! 需要安装算子包 否则有精度问题.pip install /guofy/packages/DS-V4-W4A8/need/deepgemm-2.1.0+dtk2604.torch2100.2609231729.gc7589e-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
 
 ## 当前软件栈
 
@@ -34,7 +36,7 @@
 ### SGLang DAS 与 Mooncake wheel
 
 ```bash
-pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /stortest/lzb_space/prefetch_reduction2428/attempt-20261003-082549/packages/sglang-0.5.18.post2.dev0+g924de4cf8-py3-none-any.whl --no-deps  (待更新)
+pip install -U /guofy/packages/0920/sglang/1830/sglang_kernel-0.4.6.post1-cp39-abi3-linux_x86_64.whl /guofy/packages/1012/sglang/1900/sglang-0.5.18.post1.dev0+g51622b1f1-py3-none-any.whl --no-deps   
 pip install -U /guofy/packages/1010/mooncake/1400/mooncake_transfer_engine_shca-0.3.13.post1+das.opt1.dtk2604.g808124-cp310-cp310-manylinux_2_35_x86_64.whl --no-deps
 ```
 
@@ -43,7 +45,7 @@ pip install -U /guofy/packages/1010/mooncake/1400/mooncake_transfer_engine_shca-
 ```bash
 pip list |grep -e sglang -e moon
 mooncake-transfer-engine-shca            0.3.13.post1+das.opt1.dtk2604.g808124
-sglang                                   0.5.18.post2.dev0+g924de4cf8
+sglang                                   0.5.18.post2.dev0+g51622b1f1
 sglang-kernel                            0.4.6.post1
 sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 ```
@@ -1430,8 +1432,8 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     # mooncake client所在节点(当前与P同节点;client不必须在P上,故独立变量)
     mc_node_ip = <PREFILL_NODE_IP>
     ib_devices = shca_0,shca_1,shca_2,shca_3
-    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>
-    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>
+    p_dist_init_addr = <PREFILL_DIST_INIT_ADDR>:5125
+    d_dist_init_addr = <DECODE_DIST_INIT_ADDR>:5123
     topo_config = /guofy/packages/DS-V4-W4A8/config/topo.config
     deepep_config = /guofy/packages/DS-V4-W4A8/config/deepep_config.json
     init_expert_location = /guofy/packages/DS-V4-W4A8/need/placement_candidate.json
@@ -1475,7 +1477,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
 
     [mooncake_client]
     host = ${common:mc_node_ip}
-    global_segment_size = 80GB
+    global_segment_size = 8GB
     local_buffer_size = 4GB
     master_server_address = ${common:p_node_ip}:50051
     metadata_server = P2PHANDSHAKE
@@ -1759,6 +1761,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     FASTOKENS_BPE_THREADS=1
     SGLANG_TIMEOUT_KEEP_ALIVE=75
     SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    MC_WORKERS_PER_CTX=1
     #mxh优化
     SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
     SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
@@ -2055,6 +2058,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export FASTOKENS_BPE_THREADS=1
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
+    export MC_WORKERS_PER_CTX=1
     export SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
     export SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
     export SGLANG_DSV4_CHAT_ENCODING_TIMING=0
