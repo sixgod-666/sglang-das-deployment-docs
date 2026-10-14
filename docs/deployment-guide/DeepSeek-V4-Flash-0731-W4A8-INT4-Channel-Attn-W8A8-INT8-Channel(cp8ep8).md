@@ -7,6 +7,8 @@
     - 当前性能: dfs 1000user最高性能值为78W ,CPU250user,最高性能值为89W.(mxhCPU性能可达97W) ;
     - P节点新增环境变量 export MC_WORKERS_PER_CTX=1
     - !!!! 需要安装算子包 否则有精度问题.pip install /guofy/packages/DS-V4-W4A8/need/deepgemm-2.1.0+dtk2604.torch2100.2609231729.gc7589e-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+    - DFS配置新增 export MOONCAKE_READ_PLAN_ADAPTIVE_SOURCE=1
+
 
 ## 当前软件栈
 
@@ -1762,6 +1764,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     SGLANG_TIMEOUT_KEEP_ALIVE=75
     SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     MC_WORKERS_PER_CTX=1
+    MOONCAKE_READ_PLAN_ADAPTIVE_SOURCE=1
     #mxh优化
     SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
     SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
@@ -2059,6 +2062,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export SGLANG_TIMEOUT_KEEP_ALIVE=75
     export SGLANG_MOONCAKE_SESSION_REFRESH_AGE_S=5
     export MC_WORKERS_PER_CTX=1
+    export MOONCAKE_READ_PLAN_ADAPTIVE_SOURCE=1
     export SGLANG_DSV4_ASYNC_CHAT_ENCODING=0
     export SGLANG_DSV4_CHAT_ENCODING_CONCURRENCY=0
     export SGLANG_DSV4_CHAT_ENCODING_TIMING=0
