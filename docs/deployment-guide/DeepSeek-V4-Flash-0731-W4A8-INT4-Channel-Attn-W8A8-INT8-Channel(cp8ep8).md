@@ -701,8 +701,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     [mooncake_client_global]
     MOONCAKE_LOCAL_HOSTNAME = ${common:mc_node_ip}
     MC_STORE_CLIENT_METRIC = 1
-    MC_STORE_ENABLE_SESSION_CACHE = 0
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
+
 
 
 
@@ -911,8 +910,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MC_SLICE_SIZE = 1048576
 
 
-    MC_STORE_ENABLE_SESSION_CACHE = 0
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
+
     MC_STORE_DFS_READ_TRACE = 1
     SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
 
@@ -1065,8 +1063,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     ```bash
     export MOONCAKE_LOCAL_HOSTNAME=<PREFILL_NODE_IP>
     export MC_STORE_CLIENT_METRIC=1
-    export MC_STORE_ENABLE_SESSION_CACHE=0
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
+
     nohup mooncake_client \
         --host=<PREFILL_NODE_IP> \
         --global_segment_size=200GB \
@@ -1155,8 +1152,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MC_IB_PCI_RELAXED_ORDERING=0
     export MC_TRANSFER_TIMEOUT=30
     export MC_SLICE_SIZE=1048576
-    export MC_STORE_ENABLE_SESSION_CACHE=0
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
     export MC_STORE_DFS_READ_TRACE=1
     export SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
     export SGLANG_LIGHTOP_DEQUANTIZE_K_CACHE_PAGED=1
@@ -1474,8 +1469,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_DFS_EVICTION_LOW_WATERMARK = 0.60
     MOONCAKE_DFS_EVICTION_CHECK_INTERVAL = 2
     MOONCAKE_DFS_DEFERRED_FREE_SECONDS = 10
-    MC_STORE_ENABLE_SESSION_CACHE = 1
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
+
 
     [mooncake_client]
     host = ${common:mc_node_ip}
@@ -1506,8 +1500,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_DFS_SINGLE_TENANT = True
     MOONCAKE_OFFLOAD_ENABLED = True
     MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR = distributed_storage_backend
-    MC_STORE_ENABLE_SESSION_CACHE = 1
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
+
     MC_STORE_MEMCPY=1
     MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
 
@@ -1735,10 +1728,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     MOONCAKE_ENABLE_SSD_OFFLOAD = 1
     MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR = distributed_storage_backend
     MOONCAKE_OFFLOAD_FILE_STORAGE_PATH = ${common:dfs_root}
-    MC_STORE_ENABLE_SESSION_CACHE = 1
+
     MC_STORE_DFS_READ_TRACE = 1
     MOONCAKE_DFS_BATCH_READ_THREADS = 32
-    MC_STORE_ENABLE_DFS_PREFETCH = 0
     SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT = 60
     MOONCAKE_DFS_FORCE_ONE_REPLICA = True
 
@@ -1907,8 +1899,6 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MOONCAKE_DFS_EVICTION_LOW_WATERMARK=0.60
     export MOONCAKE_DFS_EVICTION_CHECK_INTERVAL=2
     export MOONCAKE_DFS_DEFERRED_FREE_SECONDS=10
-    export MC_STORE_ENABLE_SESSION_CACHE=1
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
     nohup mooncake_master \
         --logtostderr \
         --eviction_high_watermark_ratio=0.8 \
@@ -1935,8 +1925,7 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MOONCAKE_DFS_SINGLE_TENANT=True
     export MOONCAKE_OFFLOAD_ENABLED=True
     export MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR=distributed_storage_backend
-    export MC_STORE_ENABLE_SESSION_CACHE=1
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
+
     export MC_STORE_MEMCPY=1
     export MC_STORE_PINNED_RESTORE_ARENA_SIZE_BYTES=8589934592
     nohup mooncake_client \
@@ -2043,10 +2032,9 @@ sglang-router                            0.3.2+dtk2604.2608271559.gd8a06d
     export MOONCAKE_ENABLE_SSD_OFFLOAD=1
     export MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR=distributed_storage_backend
     export MOONCAKE_OFFLOAD_FILE_STORAGE_PATH=<DFS_ROOT>
-    export MC_STORE_ENABLE_SESSION_CACHE=1
+
     export MC_STORE_DFS_READ_TRACE=1
     export MOONCAKE_DFS_BATCH_READ_THREADS=32
-    export MC_STORE_ENABLE_DFS_PREFETCH=0
     export SGLANG_UVICORN_WORKER_HEALTHCHECK_TIMEOUT=60
     export MOONCAKE_DFS_FORCE_ONE_REPLICA=True
     export MC_STORE_DFS_PINNED_POOL_BYTES=8589934592

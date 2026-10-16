@@ -11,6 +11,11 @@
 | `<DFS_ROOT>` | Mooncake DFS 与 Offload 使用的存储根目录。目录权限、容量和挂载方式必须先验证。 |
 | `<WORKSPACE_ROOT>` | 内部自动化配置、压测 Run 或工作空间的根目录。 |
 | `<LOG_FILE>` | 服务进程重定向日志的目标文件；建议使用当前 Run 独立的路径。 |
+| `<NODE_IP>` | 单节点部署中 Prefill、Decode、Mooncake 与 Router 共用的节点地址或 hostname。 |
+| `<DFS_ROOT>` | Mooncake DFS 与 Offload 使用的存储根目录；与既有 `<DFS_ROOT>` 的语义相同。 |
+| `<MODEL_ROOT>` | 模型权重根目录；与模型目录拼接前先确认权限和 revision。 |
+| `<PACKAGE_ROOT>` | 经过验证的软件包、拓扑、chat template 与环境准备脚本所在的根目录。 |
+| `<WRAPPER_ROOT>` | 运行期 Python wrapper 所在根目录；仅在目标镜像中验证后设置。 |
 
 ## 保留的路径
 

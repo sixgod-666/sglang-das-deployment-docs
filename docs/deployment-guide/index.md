@@ -11,5 +11,6 @@
 | --- | --- | --- | --- |
 | 1. DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-CP8EP8 | 待整理 | W4A8 / CP8EP8 | [打开 Recipe](DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(cp8ep8).md) |
 | 2. DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel-DP8EP8 | 待整理 | W4A8 / DP8EP8 | [打开 Recipe](DeepSeek-V4-Flash-0731-W4A8-INT4-Channel-Attn-W8A8-INT8-Channel(dp8ep8).md) |
+| 3. Spark-X2.5-1.7B | 配置快照 | TP2×2 Prefill / TP2 Decode / CPU 与 DFS + SSD Offload | [打开 Recipe](Spark-X2.5-1.7B.md) |
 
 每份 Recipe 后续独立补齐：受控软件栈、GPU-only / CPU / DFS / PD 等适用形态、启动步骤、真实服务验证、性能基线和故障排查。
